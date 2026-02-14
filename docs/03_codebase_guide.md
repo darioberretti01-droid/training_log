@@ -1,0 +1,145 @@
+# 03 - Codebase Guide
+
+This document describes the current implementation in practical terms.
+
+## 1. High-Level Architecture
+
+App stack:
+- Flutter UI
+- Riverpod for dependency wiring and state providers
+- GoRouter for navigation
+- Drift + SQLite for local persistence
+
+Current flow:
+1. App starts and loads home (`/`).
+2. Home triggers seeding if DB is empty.
+3. User sees exercise list.
+4. User opens quick log for an exercise and saves sets.
+5. User opens history to review best and recent sets.
+
+## 2. Directory Map
+
+Root:
+- `README.md` - high-level project entrypoint
+- `AGENT.md` - contribution/coherence rules
+- `docs/` - setup, roadmap, code guide
+- `scripts/windows/` - setup/bootstrap helper scripts
+- `app/` - Flutter application
+
+App source (`app/lib`):
+- `core/db/`
+  - `app_database.dart` - Drift tables + DB connection
+  - `app_database.g.dart` - generated Drift code
+  - `seed_data.dart` - seeded exercise catalog and labels
+- `core/models/`
+  - `exercise_with_labels.dart`
+  - `logged_set_input.dart`
+- `core/state/providers.dart`
+  - DB/repository providers
+  - app-level query providers
+- `features/exercises/`
+  - `exercise_repository.dart`
+  - `exercise_list_screen.dart`
+  - `exercise_history_screen.dart`
+- `features/workouts/`
+  - `quick_workout_repository.dart`
+  - `quick_workout_screen.dart`
+- `features/home/home_screen.dart`
+  - delegates to exercise list screen
+- `ui/app_router.dart`
+  - app routes
+
+Tests:
+- `app/test/core/phase_1a_repositories_test.dart`
+- `app/test/widget_test.dart`
+
+## 3. Data Model (Drift)
+
+Tables:
+- `exercises`
+  - id, name, is_seeded, created_at, updated_at
+- `exercise_labels`
+  - id, name
+- `exercise_label_links`
+  - exercise_id, label_id (composite PK)
+- `workout_sessions`
+  - id, session_type, started_at, ended_at
+- `performed_sets`
+  - id, session_id, exercise_id, set_index, reps, weight_kg, rest_seconds, rpe, performed_at
+
+Current conventions:
+- Phase 1A uses `session_type = "quick"` only.
+- Unit is kilograms only.
+- Best set ordering:
+  1. higher `weight_kg`
+  2. then higher `reps`
+  3. then latest `performed_at`
+
+## 4. Repositories and Providers
+
+Repositories:
+- `ExerciseRepository`
+  - watch list of exercises with labels
+  - get exercise by id
+  - seed DB if empty
+- `QuickWorkoutRepository`
+  - save quick workout transactionally
+  - get best set for exercise
+  - get recent sets for exercise
+
+Provider layer (`providers.dart`):
+- `appDatabaseProvider`
+- `exerciseRepositoryProvider`
+- `quickWorkoutRepositoryProvider`
+- `seedDataProvider`
+- query providers for list/exercise/best/recent
+
+## 5. UI and Routes
+
+Routes:
+- `/` -> exercise list
+- `/quick/:exerciseId` -> quick workout entry
+- `/history/:exerciseId` -> history for one exercise
+
+Screen behavior:
+- Exercise list:
+  - shows seeded exercises + label chips
+  - tap row opens quick log
+  - history icon opens history
+- Quick workout:
+  - starts with 3 set rows
+  - required: reps and weight
+  - optional: rest and RPE
+  - save writes one session + N sets
+- History:
+  - top best-set card
+  - recent sets list with timestamp and optional rest/RPE
+
+## 6. Testing Strategy (Current)
+
+Repository tests cover:
+- seed idempotency
+- DB roundtrip for quick workout save
+- best-set ranking rule
+- basic validation failures
+
+Widget test covers:
+- app boot with provider overrides
+- home shell rendering with exercise list
+
+## 7. Known Limitations
+
+- No split/day-plan programming yet.
+- No progression/suggestion rules yet.
+- No custom exercise create/edit/delete yet.
+- No migration history yet (schema version is 1).
+
+## 8. How to Extend Safely
+
+Before changing persistence or flow:
+1. Update this document and `docs/02_long_term_plan.md`.
+2. Add/adjust tests first for critical behavior.
+3. Keep feature boundaries in `core` and `features`.
+4. Re-run:
+   - `flutter analyze`
+   - `flutter test`

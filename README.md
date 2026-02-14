@@ -1,22 +1,56 @@
 # Training Log App
 
-Beginner-first workspace for building your Flutter training app.
+Beginner-first Flutter project for a smartphone training log.
 
-## What this folder contains
-- `docs/01_environment_setup.md`: complete setup walkthrough for your machine.
-- `scripts/windows/install_prerequisites.ps1`: installs Flutter + Android Studio + base tools.
-- `scripts/windows/verify_environment.ps1`: checks if your setup is ready.
-- `scripts/windows/create_flutter_app.ps1`: creates and bootstraps the app project with planned dependencies and folders.
-- `scripts/windows/init_git_repo.ps1`: initializes git and writes a root `.gitignore`.
+## Project Status
+- Environment setup: complete
+- Android toolchain: verified
+- Current implementation milestone: **Phase 1A complete**
+  - local DB schema
+  - seeded exercises
+  - exercise list
+  - quick single-exercise logging
+  - basic history with best-set logic
 
-## Recommended order
-1. Follow `docs/01_environment_setup.md`.
-2. Run installer script in PowerShell.
-3. Restart terminal/PC if requested.
-4. Run verification script.
-5. Run bootstrap script to create the app.
-6. Run git init script.
-7. Return here and we implement Milestone 1 together.
+## Repository Structure
+- `app/` - Flutter application code
+- `docs/` - setup, roadmap, and architecture docs
+- `scripts/windows/` - Windows helper scripts for setup/bootstrap
+- `AGENT.md` - contributor rules to keep project coherence
 
-## Why this approach
-You are starting from zero. Splitting setup from implementation prevents hidden toolchain issues from blocking actual feature work and keeps learning structured.
+## Documentation Map
+- `docs/01_environment_setup.md`
+  - Windows setup walkthrough
+- `docs/02_long_term_plan.md`
+  - roadmap, phase tracking, and next priorities
+- `docs/03_codebase_guide.md`
+  - current architecture, data model, flow, and test strategy
+
+## Development Workflow
+From `app/`:
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter run -d emulator-5554
+```
+
+## Windows Setup Scripts
+- `scripts/windows/install_prerequisites.ps1`
+- `scripts/windows/verify_environment.ps1`
+- `scripts/windows/create_flutter_app.ps1`
+- `scripts/windows/init_git_repo.ps1`
+
+These are useful for recovery/new machine onboarding even after initial setup.
+
+## Pre-Commit Checklist
+1. Ensure feature scope matches current roadmap phase.
+2. Update docs if code behavior/schema/routes changed:
+   - `docs/02_long_term_plan.md`
+   - `docs/03_codebase_guide.md`
+   - `README.md` (if entrypoint workflow changed)
+3. Run:
+   - `flutter analyze`
+   - `flutter test`
+4. Commit only when checks pass.

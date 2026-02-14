@@ -1,0 +1,76 @@
+# 02 - Long Term Plan
+
+This document tracks the product roadmap and current status.
+
+## Current Status (as of 2026-02-14)
+- Environment setup complete (Flutter + Android toolchain verified).
+- Phase 1A implemented:
+  - local DB schema (exercises, labels, sessions, performed sets)
+  - seeded exercise catalog
+  - exercise list screen
+  - quick single-exercise logging
+  - exercise history with best-set logic
+  - automated tests for repository logic + basic widget shell
+
+## Roadmap
+
+### Phase 0 - Foundations (done)
+- Git repo and initial commit
+- CI workflow scaffold in app
+- basic project structure
+- setup docs and bootstrap scripts
+
+### Phase 1 - Core Log Minimal (in progress)
+Phase 1A (done):
+- DB entities: `Exercise`, `WorkoutSession`, `PerformedSet` (+ labels tables)
+- seed exercises (no video)
+- UI: exercise list + quick workout
+- save sessions
+- history basics per exercise
+- tests: persistence roundtrip and best-set logic
+
+Phase 1B (next):
+- improve UI polish and validation UX
+- add session-level history browsing
+- strengthen widget/integration tests for quick log flow
+- prepare migration strategy for future split programming
+
+### Phase 2 - Split Programming (MVP)
+- DB: `Split`, `DayPlan`, `PlannedExercise`
+- split builder UI (days, exercises, sets, rep range, optional rest/RPE)
+- summary screen: set volume by label/muscle group
+- launch workout from day plan
+- workout screen references: last / best-in-split / best all-time
+
+### Phase 3 - Progression and Warnings (v1.1)
+- increase-load suggestion when prior range was saturated
+- warning when reps drop below lower bound
+- starting load suggestion:
+  - first by same exercise
+  - then by similar labels
+
+### Phase 4 - Smart Scheduling (v1.2)
+- home logic based on:
+  - last completed workout
+  - split sequence
+  - skipped days / extra workouts
+- tests for today/next selection logic
+
+### Phase 5 - Advanced Features (post-MVP)
+- quick exercise swap during workout + load suggestion
+- superset/dropset modeling and UI
+- technique videos
+- export/backup
+- analytics
+- optional cloud sync/login
+
+## Non-Goals for Current Scope
+- iOS runtime support from Windows host
+- cloud auth/sync
+- advanced progression algorithms
+
+## Planning and Delivery Rules
+- Keep each implementation slice small and test-backed.
+- Before each commit, update:
+  - this roadmap if phase status changed
+  - `docs/03_codebase_guide.md` if architecture/behavior changed
