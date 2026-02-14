@@ -1,0 +1,19 @@
+﻿# System / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/coverage/
+
+# Android / iOS generated
+**/android/.gradle/
+**/android/local.properties
+**/ios/Pods/
+**/ios/.symlinks/
