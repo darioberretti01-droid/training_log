@@ -52,6 +52,7 @@ App source (`app/lib`):
 Tests:
 - `app/test/core/phase_1a_repositories_test.dart`
 - `app/test/widget_test.dart`
+- `app/test/widget/phase_1b_flow_test.dart`
 
 ## 3. Data Model (Drift)
 
@@ -74,6 +75,9 @@ Current conventions:
   1. higher `weight_kg`
   2. then higher `reps`
   3. then latest `performed_at`
+- Migration strategy:
+  - schema version currently `1`
+  - `MigrationStrategy` is defined in `AppDatabase` with upgrade hook reserved for Phase 2+ table additions
 
 ## 4. Repositories and Providers
 
@@ -86,6 +90,7 @@ Repositories:
   - save quick workout transactionally
   - get best set for exercise
   - get recent sets for exercise
+  - get recent session-grouped history for exercise
 
 Provider layer (`providers.dart`):
 - `appDatabaseProvider`
@@ -93,6 +98,7 @@ Provider layer (`providers.dart`):
 - `quickWorkoutRepositoryProvider`
 - `seedDataProvider`
 - query providers for list/exercise/best/recent
+- session-grouped history provider: `recentSessionsByExerciseProvider`
 
 ## 5. UI and Routes
 
@@ -113,7 +119,8 @@ Screen behavior:
   - save writes one session + N sets
 - History:
   - top best-set card
-  - recent sets list with timestamp and optional rest/RPE
+  - recent sessions grouped by workout session
+  - each session shows timestamp, duration, and its set list
 
 ## 6. Testing Strategy (Current)
 
@@ -126,6 +133,7 @@ Repository tests cover:
 Widget test covers:
 - app boot with provider overrides
 - home shell rendering with exercise list
+- quick workout validation UX and successful save path
 
 ## 7. Known Limitations
 

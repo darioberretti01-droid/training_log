@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/db/app_database.dart';
 import '../../core/state/providers.dart';
+import '../workouts/quick_workout_repository.dart';
 
 class ExerciseHistoryScreen extends ConsumerWidget {
   const ExerciseHistoryScreen({
@@ -27,7 +28,9 @@ class ExerciseHistoryScreen extends ConsumerWidget {
         }
 
         final bestState = ref.watch(bestSetByExerciseProvider(exerciseId));
-        final recentState = ref.watch(recentSetsByExerciseProvider(exerciseId));
+        final sessionState = ref.watch(
+          recentSessionsByExerciseProvider(exerciseId),
+        );
 
         return Scaffold(
           appBar: AppBar(title: Text('${exercise.name} History')),
@@ -53,28 +56,25 @@ class ExerciseHistoryScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
-                'Recent sets',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text('Recent sessions', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              recentState.when(
-                data: (sets) {
-                  if (sets.isEmpty) {
+              sessionState.when(
+                data: (sessions) {
+                  if (sessions.isEmpty) {
                     return const Card(
                       child: Padding(
                         padding: EdgeInsets.all(16),
-                        child: Text('No sets logged yet.'),
+                        child: Text('No sessions logged yet.'),
                       ),
                     );
                   }
 
                   return Column(
-                    children: sets
+                    children: sessions
                         .map(
-                          (set) => Padding(
+                          (session) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: _SetTile(set: set),
+                            child: _SessionCard(entry: session),
                           ),
                         )
                         .toList(growable: false),
@@ -143,23 +143,63 @@ class _BestSetCard extends StatelessWidget {
 }
 
 class _SetTile extends StatelessWidget {
-  const _SetTile({required this.set});
+  const _SetTile({
+    required this.set,
+    required this.isFirst,
+  });
 
   final PerformedSet set;
+  final bool isFirst;
 
   @override
   Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+      title: Text('Set ${set.setIndex}: ${set.reps} reps x ${set.weightKg} kg'),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isFirst) Text('Logged: ${_formatTimestamp(set.performedAt)}'),
+          if (set.restSeconds != null) Text('Rest: ${set.restSeconds}s'),
+          if (set.rpe != null) Text('RPE: ${set.rpe}'),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionCard extends StatelessWidget {
+  const _SessionCard({required this.entry});
+
+  final ExerciseSessionHistoryEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final startedAt = DateTime.fromMillisecondsSinceEpoch(entry.session.startedAt);
+    final endedAt = DateTime.fromMillisecondsSinceEpoch(entry.session.endedAt);
+    final duration = endedAt.difference(startedAt);
+    final minutes = duration.inMinutes;
+
     return Card(
-      child: ListTile(
-        title: Text('Set ${set.setIndex}: ${set.reps} reps x ${set.weightKg} kg'),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_formatTimestamp(set.performedAt)),
-            if (set.restSeconds != null) Text('Rest: ${set.restSeconds}s'),
-            if (set.rpe != null) Text('RPE: ${set.rpe}'),
-          ],
-        ),
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(
+              'Session ${DateFormat('yyyy-MM-dd HH:mm').format(startedAt)}',
+            ),
+            subtitle: Text(
+              minutes > 0 ? '$minutes min • ${entry.sets.length} sets' : '${entry.sets.length} sets',
+            ),
+          ),
+          const Divider(height: 1),
+          ...List.generate(
+            entry.sets.length,
+            (index) => _SetTile(
+              set: entry.sets[index],
+              isFirst: index == 0,
+            ),
+          ),
+        ],
       ),
     );
   }

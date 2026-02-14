@@ -11,6 +11,11 @@ This document tracks the product roadmap and current status.
   - quick single-exercise logging
   - exercise history with best-set logic
   - automated tests for repository logic + basic widget shell
+- Phase 1B started:
+  - quick-log validation UX improved (inline, persistent validation feedback)
+  - session-level history browsing added (grouped by workout session)
+  - widget tests expanded for quick-log flow
+  - DB migration strategy scaffold added for next schema phases
 
 ## Roadmap
 
@@ -29,11 +34,16 @@ Phase 1A (done):
 - history basics per exercise
 - tests: persistence roundtrip and best-set logic
 
-Phase 1B (next):
-- improve UI polish and validation UX
-- add session-level history browsing
-- strengthen widget/integration tests for quick log flow
-- prepare migration strategy for future split programming
+Phase 1B (in progress):
+- done:
+  - improve quick-log validation UX
+  - add session-level history browsing
+  - strengthen widget tests for quick-log flow
+  - add migration strategy scaffold for future split programming
+- next:
+  - add session-level overview from home (cross-exercise)
+  - add more UX polish for loading/error/empty states
+  - add integration-style tests for log -> history roundtrip across routes
 
 ### Phase 2 - Split Programming (MVP)
 - DB: `Split`, `DayPlan`, `PlannedExercise`

@@ -125,6 +125,45 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('getRecentSessionsForExercise groups sets by session', () async {
+    await exerciseRepository.seedIfEmpty();
+    final exercise = (await exerciseRepository.watchExercises().first).first;
+
+    await quickWorkoutRepository.saveQuickWorkout(
+      exerciseId: exercise.id,
+      startedAt: DateTime(2026, 1, 5, 10, 0),
+      endedAt: DateTime(2026, 1, 5, 10, 20),
+      sets: const [
+        LoggedSetInput(reps: 10, weightKg: 50),
+        LoggedSetInput(reps: 9, weightKg: 52.5),
+      ],
+    );
+
+    await quickWorkoutRepository.saveQuickWorkout(
+      exerciseId: exercise.id,
+      startedAt: DateTime(2026, 1, 6, 10, 0),
+      endedAt: DateTime(2026, 1, 6, 10, 15),
+      sets: const [
+        LoggedSetInput(reps: 8, weightKg: 55),
+      ],
+    );
+
+    final sessions = await quickWorkoutRepository.getRecentSessionsForExercise(
+      exercise.id,
+      sessionLimit: 10,
+    );
+
+    expect(sessions, hasLength(2));
+    expect(
+      sessions.first.session.startedAt,
+      DateTime(2026, 1, 6, 10, 0).millisecondsSinceEpoch,
+    );
+    expect(sessions.first.sets, hasLength(1));
+    expect(sessions.last.sets, hasLength(2));
+    expect(sessions.last.sets.first.setIndex, 1);
+    expect(sessions.last.sets.last.setIndex, 2);
+  });
 }
 
 Future<int> _exerciseCount(AppDatabase database) async {

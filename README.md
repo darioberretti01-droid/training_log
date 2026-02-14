@@ -11,6 +11,10 @@ Beginner-first Flutter project for a smartphone training log.
   - exercise list
   - quick single-exercise logging
   - basic history with best-set logic
+- Phase 1B status: **in progress**
+  - session-grouped exercise history
+  - improved quick-log validation UX
+  - expanded widget coverage for quick-log flow
 
 ## Repository Structure
 - `app/` - Flutter application code

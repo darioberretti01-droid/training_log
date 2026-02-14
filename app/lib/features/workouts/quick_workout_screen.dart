@@ -21,6 +21,7 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
   late final DateTime _startedAt;
   late List<_SetControllers> _setControllers;
   bool _isSaving = false;
+  String? _validationMessage;
 
   @override
   void initState() {
@@ -59,6 +60,7 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: FilledButton(
+                  key: const Key('quick_workout_save'),
                   onPressed: _isSaving ? null : () => _save(exercise.name),
                   child: _isSaving
                       ? const SizedBox(
@@ -78,6 +80,21 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
                 'Enter reps and weight (kg) for each set. Rest and RPE are optional.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              if (_validationMessage != null) ...[
+                const SizedBox(height: 12),
+                Card(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      _validationMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               ...List.generate(_setControllers.length, (index) {
                 final controllers = _setControllers[index];
@@ -86,6 +103,7 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
                   child: _SetCard(
                     index: index + 1,
                     controllers: controllers,
+                    onChanged: _clearValidationMessage,
                     onRemove: _setControllers.length > 1
                         ? () => _removeSet(index)
                         : null,
@@ -128,6 +146,7 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
   }
 
   Future<void> _save(String exerciseName) async {
+    _clearValidationMessage();
     final parsedSets = _parseSets();
     if (parsedSets == null) {
       return;
@@ -210,9 +229,17 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
   }
 
   void _showValidationError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    setState(() {
+      _validationMessage = message;
+    });
+  }
+
+  void _clearValidationMessage() {
+    if (_validationMessage != null) {
+      setState(() {
+        _validationMessage = null;
+      });
+    }
   }
 }
 
@@ -220,11 +247,13 @@ class _SetCard extends StatelessWidget {
   const _SetCard({
     required this.index,
     required this.controllers,
+    required this.onChanged,
     this.onRemove,
   });
 
   final int index;
   final _SetControllers controllers;
+  final VoidCallback onChanged;
   final VoidCallback? onRemove;
 
   @override
@@ -256,16 +285,20 @@ class _SetCard extends StatelessWidget {
                 Expanded(
                   child: _NumberField(
                     controller: controllers.repsController,
+                    fieldKey: Key('set_${index}_reps'),
                     label: 'Reps *',
                     decimal: false,
+                    onChanged: (_) => onChanged(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _NumberField(
                     controller: controllers.weightController,
+                    fieldKey: Key('set_${index}_weight'),
                     label: 'Weight kg *',
                     decimal: true,
+                    onChanged: (_) => onChanged(),
                   ),
                 ),
               ],
@@ -276,16 +309,20 @@ class _SetCard extends StatelessWidget {
                 Expanded(
                   child: _NumberField(
                     controller: controllers.restController,
+                    fieldKey: Key('set_${index}_rest'),
                     label: 'Rest sec',
                     decimal: false,
+                    onChanged: (_) => onChanged(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _NumberField(
                     controller: controllers.rpeController,
+                    fieldKey: Key('set_${index}_rpe'),
                     label: 'RPE',
                     decimal: true,
+                    onChanged: (_) => onChanged(),
                   ),
                 ),
               ],
@@ -300,18 +337,24 @@ class _SetCard extends StatelessWidget {
 class _NumberField extends StatelessWidget {
   const _NumberField({
     required this.controller,
+    required this.fieldKey,
     required this.label,
     required this.decimal,
+    required this.onChanged,
   });
 
   final TextEditingController controller;
+  final Key fieldKey;
   final String label;
   final bool decimal;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      key: fieldKey,
       controller: controller,
+      onChanged: onChanged,
       keyboardType: TextInputType.numberWithOptions(decimal: decimal),
       inputFormatters: decimal
           ? [

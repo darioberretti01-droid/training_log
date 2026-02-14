@@ -49,3 +49,13 @@ final recentSetsByExerciseProvider =
           .watch(quickWorkoutRepositoryProvider)
           .getRecentSetsForExercise(exerciseId);
     });
+
+final recentSessionsByExerciseProvider =
+    FutureProvider.family<List<ExerciseSessionHistoryEntry>, String>((
+      ref,
+      exerciseId,
+    ) {
+      return ref
+          .watch(quickWorkoutRepositoryProvider)
+          .getRecentSessionsForExercise(exerciseId);
+    });

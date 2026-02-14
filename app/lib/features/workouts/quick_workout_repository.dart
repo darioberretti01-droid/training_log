@@ -18,6 +18,21 @@ abstract class QuickWorkoutRepository {
     String exerciseId, {
     int limit = 30,
   });
+
+  Future<List<ExerciseSessionHistoryEntry>> getRecentSessionsForExercise(
+    String exerciseId, {
+    int sessionLimit = 12,
+  });
+}
+
+class ExerciseSessionHistoryEntry {
+  const ExerciseSessionHistoryEntry({
+    required this.session,
+    required this.sets,
+  });
+
+  final WorkoutSession session;
+  final List<PerformedSet> sets;
 }
 
 class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
@@ -119,4 +134,59 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
 
     return query.get();
   }
+
+  @override
+  Future<List<ExerciseSessionHistoryEntry>> getRecentSessionsForExercise(
+    String exerciseId, {
+    int sessionLimit = 12,
+  }) async {
+    final query =
+        _db.select(_db.performedSets).join([
+            innerJoin(
+              _db.workoutSessions,
+              _db.workoutSessions.id.equalsExp(_db.performedSets.sessionId),
+            ),
+          ])
+          ..where(_db.performedSets.exerciseId.equals(exerciseId))
+          ..orderBy([
+            OrderingTerm.desc(_db.workoutSessions.startedAt),
+            OrderingTerm.asc(_db.performedSets.setIndex),
+          ]);
+
+    final rows = await query.get();
+    final grouped = <String, _SessionAccumulator>{};
+    final orderedSessionIds = <String>[];
+
+    for (final row in rows) {
+      final session = row.readTable(_db.workoutSessions);
+      final set = row.readTable(_db.performedSets);
+
+      if (!grouped.containsKey(session.id)) {
+        if (orderedSessionIds.length >= sessionLimit) {
+          break;
+        }
+        grouped[session.id] = _SessionAccumulator(session: session);
+        orderedSessionIds.add(session.id);
+      }
+
+      grouped[session.id]!.sets.add(set);
+    }
+
+    return orderedSessionIds
+        .map((id) {
+          final entry = grouped[id]!;
+          return ExerciseSessionHistoryEntry(
+            session: entry.session,
+            sets: List.unmodifiable(entry.sets),
+          );
+        })
+        .toList(growable: false);
+  }
+}
+
+class _SessionAccumulator {
+  _SessionAccumulator({required this.session});
+
+  final WorkoutSession session;
+  final List<PerformedSet> sets = [];
 }
