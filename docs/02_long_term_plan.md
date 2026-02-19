@@ -23,6 +23,7 @@ This document tracks the product roadmap and current status.
   - migration path from v1 to v2 (additive, data-preserving)
   - split repository + provider foundations
   - repository and migration tests for split foundation
+  - split builder create flow added (day/exercise planning + save)
 
 ## Roadmap
 
@@ -57,8 +58,8 @@ Phase 1B (in progress):
   - DB tables: `Split`, `DayPlan`, `PlannedExercise`
   - migration v1 -> v2 (additive)
   - repository layer for split create/read/delete + active split selection
+  - split builder create flow (name, ordered days, planned exercises, set/rep/rest/RPE targets)
 - next:
-- split builder UI (days, exercises, sets, rep range, optional rest/RPE)
 - summary screen: set volume by label/muscle group
 - launch workout from day plan
 - workout screen references: last / best-in-split / best all-time

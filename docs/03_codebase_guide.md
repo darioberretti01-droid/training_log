@@ -14,8 +14,9 @@ Current flow:
 1. App starts and loads home (`/`).
 2. Home triggers seeding if DB is empty.
 3. User sees recent session overview cards and the exercise list.
-4. User opens quick log for an exercise and saves sets.
-5. User opens history to review best and recent sets.
+4. User can open split builder from home and create a split.
+5. User opens quick log for an exercise and saves sets.
+6. User opens history to review best and recent sets.
 
 ## 2. Directory Map
 
@@ -45,6 +46,7 @@ App source (`app/lib`):
   - `quick_workout_repository.dart`
   - `quick_workout_screen.dart`
 - `features/splits/`
+  - `split_builder_screen.dart`
   - `split_repository.dart`
 - `features/home/home_screen.dart`
   - delegates to exercise list screen
@@ -59,6 +61,7 @@ Tests:
 - `app/test/widget_test.dart`
 - `app/test/widget/phase_1b_flow_test.dart`
 - `app/test/widget/phase_1b_home_overview_test.dart`
+- `app/test/widget/phase_2_split_builder_test.dart`
 
 ## 3. Data Model (Drift)
 
@@ -131,14 +134,21 @@ Routes:
 - `/` -> exercise list
 - `/quick/:exerciseId` -> quick workout entry
 - `/history/:exerciseId` -> history for one exercise
+- `/splits/builder` -> split builder
 
 Screen behavior:
 - Exercise list:
+  - app bar includes Split Builder entrypoint
   - shows a `Recent sessions` section with session cards (timestamp, duration, total sets, exercise summary)
   - each recent session card navigates to history for its primary exercise
   - shows seeded exercises + label chips
   - tap row opens quick log
   - history icon opens history
+- Split builder:
+  - creates a split with ordered days and ordered planned exercises
+  - captures target sets, rep range, optional rest and target RPE
+  - save writes split/day/planned rows transactionally via `SplitRepository`
+  - optional toggle sets the new split as active
 - Quick workout:
   - starts with 3 set rows
   - required: reps and weight
@@ -167,10 +177,10 @@ Widget test covers:
 - home shell rendering with exercise list
 - quick workout validation UX and successful save path
 - home recent sessions section: populated, empty, error+retry, and tap navigation
+- split builder validation and successful save path
 
 ## 7. Known Limitations
 
-- Split builder UI is not implemented yet (Phase 2 foundation is backend-first).
 - Summary screen and launch-from-day-plan flow are not implemented yet.
 - No progression/suggestion rules yet.
 - No custom exercise create/edit/delete yet.

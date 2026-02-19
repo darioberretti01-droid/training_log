@@ -15,7 +15,17 @@ class ExerciseListScreen extends ConsumerWidget {
     final seedState = ref.watch(seedDataProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Training Log')),
+      appBar: AppBar(
+        title: const Text('Training Log'),
+        actions: [
+          IconButton(
+            key: const Key('open_split_builder'),
+            tooltip: 'Split Builder',
+            onPressed: () => context.push('/splits/builder'),
+            icon: const Icon(Icons.view_week_outlined),
+          ),
+        ],
+      ),
       body: seedState.when(
         data: (_) {
           final exercisesState = ref.watch(exercisesProvider);

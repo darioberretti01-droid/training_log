@@ -13,6 +13,7 @@ Beginner-first Flutter project for a smartphone training log.
 - Phase 2 status: **foundation in progress**
   - schema v2 and migration for split programming tables
   - split repository and provider layer added
+  - split builder create flow added
   - repository + migration test coverage added
 
 ## Repository Structure
