@@ -13,7 +13,7 @@ App stack:
 Current flow:
 1. App starts and loads home (`/`).
 2. Home triggers seeding if DB is empty.
-3. User sees exercise list.
+3. User sees recent session overview cards and the exercise list.
 4. User opens quick log for an exercise and saves sets.
 5. User opens history to review best and recent sets.
 
@@ -44,6 +44,8 @@ App source (`app/lib`):
 - `features/workouts/`
   - `quick_workout_repository.dart`
   - `quick_workout_screen.dart`
+- `features/splits/`
+  - `split_repository.dart`
 - `features/home/home_screen.dart`
   - delegates to exercise list screen
 - `ui/app_router.dart`
@@ -51,8 +53,12 @@ App source (`app/lib`):
 
 Tests:
 - `app/test/core/phase_1a_repositories_test.dart`
+- `app/test/core/phase_1b_home_overview_test.dart`
+- `app/test/core/phase_2_split_repository_test.dart`
+- `app/test/core/phase_2_migration_test.dart`
 - `app/test/widget_test.dart`
 - `app/test/widget/phase_1b_flow_test.dart`
+- `app/test/widget/phase_1b_home_overview_test.dart`
 
 ## 3. Data Model (Drift)
 
@@ -67,6 +73,12 @@ Tables:
   - id, session_type, started_at, ended_at
 - `performed_sets`
   - id, session_id, exercise_id, set_index, reps, weight_kg, rest_seconds, rpe, performed_at
+- `splits`
+  - id, name, is_active, created_at, updated_at
+- `day_plans`
+  - id, split_id, day_index, title, created_at, updated_at
+- `planned_exercises`
+  - id, day_plan_id, exercise_id, order_index, target_sets, rep_min, rep_max, rest_seconds, target_rpe, created_at, updated_at
 
 Current conventions:
 - Phase 1A uses `session_type = "quick"` only.
@@ -76,8 +88,9 @@ Current conventions:
   2. then higher `reps`
   3. then latest `performed_at`
 - Migration strategy:
-  - schema version currently `1`
-  - `MigrationStrategy` is defined in `AppDatabase` with upgrade hook reserved for Phase 2+ table additions
+  - schema version currently `2`
+  - v1 -> v2 migration adds split programming tables only (data-preserving for Phase 1 tables)
+  - `MigrationStrategy` remains additive for future phases
 
 ## 4. Repositories and Providers
 
@@ -91,6 +104,13 @@ Repositories:
   - get best set for exercise
   - get recent sets for exercise
   - get recent session-grouped history for exercise
+  - get recent session overview for home (cross-exercise summary)
+- `SplitRepository`
+  - create split with day plans + planned exercises transactionally
+  - set active split (single-active invariant)
+  - watch split summaries
+  - get split details by id
+  - delete split (with cascading child delete)
 
 Provider layer (`providers.dart`):
 - `appDatabaseProvider`
@@ -99,6 +119,11 @@ Provider layer (`providers.dart`):
 - `seedDataProvider`
 - query providers for list/exercise/best/recent
 - session-grouped history provider: `recentSessionsByExerciseProvider`
+- home recent sessions provider: `recentHomeSessionsProvider`
+- split repository provider: `splitRepositoryProvider`
+- split list provider: `splitsProvider`
+- active split provider: `activeSplitProvider`
+- split details provider: `splitDetailsProvider`
 
 ## 5. UI and Routes
 
@@ -109,6 +134,8 @@ Routes:
 
 Screen behavior:
 - Exercise list:
+  - shows a `Recent sessions` section with session cards (timestamp, duration, total sets, exercise summary)
+  - each recent session card navigates to history for its primary exercise
   - shows seeded exercises + label chips
   - tap row opens quick log
   - history icon opens history
@@ -129,18 +156,24 @@ Repository tests cover:
 - DB roundtrip for quick workout save
 - best-set ranking rule
 - basic validation failures
+- home session overview ordering, session limiting, and aggregation
+- split repository validation and transactional persistence
+- single-active split behavior
+- split detail ordering and cascade delete behavior
+- v1 -> v2 migration behavior and data preservation
 
 Widget test covers:
 - app boot with provider overrides
 - home shell rendering with exercise list
 - quick workout validation UX and successful save path
+- home recent sessions section: populated, empty, error+retry, and tap navigation
 
 ## 7. Known Limitations
 
-- No split/day-plan programming yet.
+- Split builder UI is not implemented yet (Phase 2 foundation is backend-first).
+- Summary screen and launch-from-day-plan flow are not implemented yet.
 - No progression/suggestion rules yet.
 - No custom exercise create/edit/delete yet.
-- No migration history yet (schema version is 1).
 
 ## 8. How to Extend Safely
 

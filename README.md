@@ -5,16 +5,15 @@ Beginner-first Flutter project for a smartphone training log.
 ## Project Status
 - Environment setup: complete
 - Android toolchain: verified
-- Current implementation milestone: **Phase 1A complete**
-  - local DB schema
-  - seeded exercises
-  - exercise list
-  - quick single-exercise logging
-  - basic history with best-set logic
-- Phase 1B status: **in progress**
+- Phase 1 status: **core complete, with deferred polish backlog**
   - session-grouped exercise history
+  - home recent session overview
   - improved quick-log validation UX
   - expanded widget coverage for quick-log flow
+- Phase 2 status: **foundation in progress**
+  - schema v2 and migration for split programming tables
+  - split repository and provider layer added
+  - repository + migration test coverage added
 
 ## Repository Structure
 - `app/` - Flutter application code

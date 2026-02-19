@@ -81,6 +81,84 @@ class PerformedSets extends Table {
   Set<Column<Object>>? get primaryKey => {id};
 }
 
+class Splits extends Table {
+  TextColumn get id => text()();
+
+  TextColumn get name => text()();
+
+  BoolColumn get isActive =>
+      boolean().named('is_active').withDefault(const Constant(false))();
+
+  IntColumn get createdAt => integer().named('created_at')();
+
+  IntColumn get updatedAt => integer().named('updated_at')();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class DayPlans extends Table {
+  TextColumn get id => text()();
+
+  TextColumn get splitId => text()
+      .named('split_id')
+      .references(Splits, #id, onDelete: KeyAction.cascade)();
+
+  IntColumn get dayIndex => integer().named('day_index')();
+
+  TextColumn get title => text()();
+
+  IntColumn get createdAt => integer().named('created_at')();
+
+  IntColumn get updatedAt => integer().named('updated_at')();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => ['UNIQUE(split_id, day_index)'];
+}
+
+class PlannedExercises extends Table {
+  TextColumn get id => text()();
+
+  TextColumn get dayPlanId => text()
+      .named('day_plan_id')
+      .references(DayPlans, #id, onDelete: KeyAction.cascade)();
+
+  TextColumn get exerciseId =>
+      text().named('exercise_id').references(Exercises, #id)();
+
+  IntColumn get orderIndex => integer().named('order_index')();
+
+  IntColumn get targetSets => integer().named('target_sets')();
+
+  IntColumn get repMin => integer().named('rep_min')();
+
+  IntColumn get repMax => integer().named('rep_max')();
+
+  IntColumn get restSeconds => integer().named('rest_seconds').nullable()();
+
+  RealColumn get targetRpe => real().named('target_rpe').nullable()();
+
+  IntColumn get createdAt => integer().named('created_at')();
+
+  IntColumn get updatedAt => integer().named('updated_at')();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'UNIQUE(day_plan_id, order_index)',
+    'CHECK (target_sets > 0)',
+    'CHECK (rep_min > 0)',
+    'CHECK (rep_max >= rep_min)',
+    'CHECK (rest_seconds IS NULL OR rest_seconds >= 0)',
+    'CHECK (target_rpe IS NULL OR (target_rpe >= 0 AND target_rpe <= 10))',
+  ];
+}
+
 @DriftDatabase(
   tables: [
     Exercises,
@@ -88,25 +166,31 @@ class PerformedSets extends Table {
     ExerciseLabelLinks,
     WorkoutSessions,
     PerformedSets,
+    Splits,
+    DayPlans,
+    PlannedExercises,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async => m.createAll(),
-        onUpgrade: (m, from, to) async {
-          // Reserved for future phased upgrades (e.g. split/day-plan tables in Phase 2).
-          // Keep migrations additive and data-preserving.
-        },
-        beforeOpen: (details) async {
-          await customStatement('PRAGMA foreign_keys = ON;');
-        },
-      );
+    onCreate: (m) async => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(splits);
+        await m.createTable(dayPlans);
+        await m.createTable(plannedExercises);
+      }
+    },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    },
+  );
 }
 
 QueryExecutor _openConnection() {

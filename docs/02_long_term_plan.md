@@ -2,7 +2,7 @@
 
 This document tracks the product roadmap and current status.
 
-## Current Status (as of 2026-02-14)
+## Current Status (as of 2026-02-19)
 - Environment setup complete (Flutter + Android toolchain verified).
 - Phase 1A implemented:
   - local DB schema (exercises, labels, sessions, performed sets)
@@ -14,8 +14,15 @@ This document tracks the product roadmap and current status.
 - Phase 1B started:
   - quick-log validation UX improved (inline, persistent validation feedback)
   - session-level history browsing added (grouped by workout session)
+  - home recent session overview added (cross-exercise summary cards)
   - widget tests expanded for quick-log flow
   - DB migration strategy scaffold added for next schema phases
+  - note: remaining Phase 1B polish/integration tasks are deferred while Phase 2 starts
+- Phase 2 started:
+  - schema v2 with split-programming tables (`splits`, `day_plans`, `planned_exercises`)
+  - migration path from v1 to v2 (additive, data-preserving)
+  - split repository + provider foundations
+  - repository and migration tests for split foundation
 
 ## Roadmap
 
@@ -38,15 +45,19 @@ Phase 1B (in progress):
 - done:
   - improve quick-log validation UX
   - add session-level history browsing
+  - add session-level overview from home (cross-exercise)
   - strengthen widget tests for quick-log flow
   - add migration strategy scaffold for future split programming
-- next:
-  - add session-level overview from home (cross-exercise)
+- deferred backlog for now:
   - add more UX polish for loading/error/empty states
   - add integration-style tests for log -> history roundtrip across routes
 
-### Phase 2 - Split Programming (MVP)
-- DB: `Split`, `DayPlan`, `PlannedExercise`
+### Phase 2 - Split Programming (MVP, in progress)
+- done:
+  - DB tables: `Split`, `DayPlan`, `PlannedExercise`
+  - migration v1 -> v2 (additive)
+  - repository layer for split create/read/delete + active split selection
+- next:
 - split builder UI (days, exercises, sets, rep range, optional rest/RPE)
 - summary screen: set volume by label/muscle group
 - launch workout from day plan

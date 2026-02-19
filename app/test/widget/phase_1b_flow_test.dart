@@ -85,15 +85,18 @@ class _FakeQuickWorkoutRepository implements QuickWorkoutRepository {
   Future<List<PerformedSet>> getRecentSetsForExercise(
     String exerciseId, {
     int limit = 30,
-  }) async =>
-      const [];
+  }) async => const [];
 
   @override
   Future<List<ExerciseSessionHistoryEntry>> getRecentSessionsForExercise(
     String exerciseId, {
     int sessionLimit = 12,
-  }) async =>
-      const [];
+  }) async => const [];
+
+  @override
+  Future<List<HomeSessionOverviewEntry>> getRecentSessionsOverview({
+    int sessionLimit = 8,
+  }) async => const [];
 
   @override
   Future<String> saveQuickWorkout({

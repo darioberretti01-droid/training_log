@@ -12,16 +12,15 @@ void main() {
         overrides: [
           seedDataProvider.overrideWith((ref) async {}),
           exercisesProvider.overrideWith(
-            (ref) => Stream.value(
-              const [
-                ExerciseWithLabels(
-                  id: 'bench_press',
-                  name: 'Barbell Bench Press',
-                  labels: ['push', 'chest', 'triceps'],
-                ),
-              ],
-            ),
+            (ref) => Stream.value(const [
+              ExerciseWithLabels(
+                id: 'bench_press',
+                name: 'Barbell Bench Press',
+                labels: ['push', 'chest', 'triceps'],
+              ),
+            ]),
           ),
+          recentHomeSessionsProvider.overrideWith((ref) async => const []),
         ],
         child: const TrainingLogApp(),
       ),
