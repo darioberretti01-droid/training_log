@@ -14,6 +14,8 @@ Beginner-first Flutter project for a smartphone training log.
   - schema v2 and migration for split programming tables
   - split repository and provider layer added
   - split builder create flow added
+  - split browsing UI added (active split + all splits)
+  - root app shell updated with Home/Splits/Exercises/Other tabs
   - repository + migration test coverage added
 
 ## Repository Structure

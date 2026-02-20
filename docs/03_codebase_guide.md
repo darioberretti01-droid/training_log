@@ -12,11 +12,12 @@ App stack:
 
 Current flow:
 1. App starts and loads home (`/`).
-2. Home triggers seeding if DB is empty.
-3. User sees recent session overview cards and the exercise list.
-4. User can open split builder from home and create a split.
-5. User opens quick log for an exercise and saves sets.
-6. User opens history to review best and recent sets.
+2. Root shell shows bottom tabs: `Home`, `Splits`, `Exercises`, `Other`.
+3. `Home` shows quick logging actions and recent session overview.
+4. `Exercises` triggers seeding if DB is empty and shows exercise list.
+5. User can open split builder from `Splits` via top-right `+`.
+6. User opens quick log for an exercise and saves sets.
+7. User opens history to review best and recent sets.
 
 ## 2. Directory Map
 
@@ -47,9 +48,10 @@ App source (`app/lib`):
   - `quick_workout_screen.dart`
 - `features/splits/`
   - `split_builder_screen.dart`
+  - `splits_screen.dart`
   - `split_repository.dart`
 - `features/home/home_screen.dart`
-  - delegates to exercise list screen
+  - root tab shell and lightweight Home/Other tab content
 - `ui/app_router.dart`
   - app routes
 
@@ -61,6 +63,7 @@ Tests:
 - `app/test/widget_test.dart`
 - `app/test/widget/phase_1b_flow_test.dart`
 - `app/test/widget/phase_1b_home_overview_test.dart`
+- `app/test/widget/phase_2_home_shell_test.dart`
 - `app/test/widget/phase_2_split_builder_test.dart`
 
 ## 3. Data Model (Drift)
@@ -131,19 +134,29 @@ Provider layer (`providers.dart`):
 ## 5. UI and Routes
 
 Routes:
-- `/` -> exercise list
+- `/` -> root tab shell
 - `/quick/:exerciseId` -> quick workout entry
 - `/history/:exerciseId` -> history for one exercise
 - `/splits/builder` -> split builder
 
 Screen behavior:
-- Exercise list:
-  - app bar includes Split Builder entrypoint
-  - shows a `Recent sessions` section with session cards (timestamp, duration, total sets, exercise summary)
+- Root shell:
+  - app bar title reflects selected tab (`Home`, `Splits`, `Exercises`, `Other`)
+  - bottom navigation exposes 4 sections
+  - top-right prominent `+` appears on `Splits` tab and opens split builder
+- Home tab:
+  - large `Log current split` action
+  - two secondary actions: `Log from other split`, `Log single exercises`
+  - `Recent sessions` section with session cards (timestamp, duration, total sets, exercise summary)
   - each recent session card navigates to history for its primary exercise
+- Exercise list:
   - shows seeded exercises + label chips
   - tap row opens quick log
   - history icon opens history
+- Splits:
+  - highlighted `Current split` section showing active split (if any)
+  - `All splits` section with all saved splits ordered by latest update
+  - each split row shows day count and update timestamp
 - Split builder:
   - creates a split with ordered days and ordered planned exercises
   - captures target sets, rep range, optional rest and target RPE
@@ -173,15 +186,17 @@ Repository tests cover:
 - v1 -> v2 migration behavior and data preservation
 
 Widget test covers:
-- app boot with provider overrides
+- app boot with root home tab + tab switch behavior
 - home shell rendering with exercise list
 - quick workout validation UX and successful save path
 - home recent sessions section: populated, empty, error+retry, and tap navigation
+- split tab rendering and split-builder navigation from `+`
 - split builder validation and successful save path
 
 ## 7. Known Limitations
 
 - Summary screen and launch-from-day-plan flow are not implemented yet.
+- Home tab action buttons are UI placeholders (logging behavior not wired yet).
 - No progression/suggestion rules yet.
 - No custom exercise create/edit/delete yet.
 

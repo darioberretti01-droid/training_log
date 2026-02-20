@@ -6,11 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:training_log_app/core/db/app_database.dart';
 import 'package:training_log_app/core/models/exercise_with_labels.dart';
 import 'package:training_log_app/core/state/providers.dart';
-import 'package:training_log_app/features/exercises/exercise_list_screen.dart';
+import 'package:training_log_app/features/home/home_screen.dart';
 import 'package:training_log_app/features/workouts/quick_workout_repository.dart';
 
 void main() {
-  testWidgets('home shows recent sessions and exercise list', (tester) async {
+  testWidgets('home shows recent sessions below home actions', (tester) async {
     final sessions = [
       _entry(
         sessionId: 'session_1',
@@ -46,14 +46,14 @@ void main() {
       find.text('Exercises: Bench Press, Barbell Row (+1 more)'),
       findsOneWidget,
     );
-    expect(find.text('Barbell Bench Press'), findsOneWidget);
+    expect(find.byKey(const Key('home_log_current_split')), findsOneWidget);
   });
 
   testWidgets('home recent sessions shows empty state', (tester) async {
     await _pumpHome(tester, recentSessionsLoader: (_) async => const []);
 
     expect(find.text('No sessions logged yet.'), findsOneWidget);
-    expect(find.text('Barbell Bench Press'), findsOneWidget);
+    expect(find.byKey(const Key('home_log_current_split')), findsOneWidget);
   });
 
   testWidgets('home recent sessions shows error state and retry reloads', (
@@ -91,10 +91,7 @@ void main() {
   ) async {
     final router = GoRouter(
       routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => const ExerciseListScreen(),
-        ),
+        GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
         GoRoute(
           path: '/history/:exerciseId',
           builder: (context, state) {
@@ -154,10 +151,7 @@ Future<void> _pumpHome(
 }) async {
   final router = GoRouter(
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const ExerciseListScreen(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
       GoRoute(
         path: '/history/:exerciseId',
         builder: (context, state) => const SizedBox.shrink(),
