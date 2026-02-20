@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/exercise_with_labels.dart';
@@ -498,6 +499,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                     ),
                     controller: draft.targetSetsController,
                     label: 'Sets *',
+                    allowDecimal: false,
                     onChanged: onChanged,
                   ),
                 ),
@@ -509,6 +511,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                     ),
                     controller: draft.repMinController,
                     label: 'Rep min *',
+                    allowDecimal: false,
                     onChanged: onChanged,
                   ),
                 ),
@@ -520,6 +523,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                     ),
                     controller: draft.repMaxController,
                     label: 'Rep max *',
+                    allowDecimal: false,
                     onChanged: onChanged,
                   ),
                 ),
@@ -535,6 +539,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                     ),
                     controller: draft.restSecondsController,
                     label: 'Rest sec',
+                    allowDecimal: false,
                     onChanged: onChanged,
                   ),
                 ),
@@ -546,6 +551,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                     ),
                     controller: draft.targetRpeController,
                     label: 'Target RPE',
+                    allowDecimal: true,
                     onChanged: onChanged,
                   ),
                 ),
@@ -563,12 +569,14 @@ class _NumericField extends StatelessWidget {
     required this.fieldKey,
     required this.controller,
     required this.label,
+    required this.allowDecimal,
     required this.onChanged,
   });
 
   final Key fieldKey;
   final TextEditingController controller;
   final String label;
+  final bool allowDecimal;
   final VoidCallback onChanged;
 
   @override
@@ -576,7 +584,12 @@ class _NumericField extends StatelessWidget {
     return TextField(
       key: fieldKey,
       controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      keyboardType: TextInputType.numberWithOptions(decimal: allowDecimal),
+      inputFormatters: [
+        allowDecimal
+            ? FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))
+            : FilteringTextInputFormatter.digitsOnly,
+      ],
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),

@@ -17,3 +17,5 @@ Thumbs.db
 **/android/local.properties
 **/ios/Pods/
 **/ios/.symlinks/
+window_dump.xml
+emulator_home.png
