@@ -6,6 +6,8 @@ import '../../core/db/app_database.dart';
 abstract class SplitRepository {
   Future<String> createSplit(SplitDraftInput input);
 
+  Future<void> updateSplit(String splitId, SplitDraftInput input);
+
   Future<void> setActiveSplit(String splitId);
 
   Stream<List<SplitSummary>> watchSplits();
@@ -197,6 +199,71 @@ class DriftSplitRepository implements SplitRepository {
     });
 
     return splitId;
+  }
+
+  @override
+  Future<void> updateSplit(String splitId, SplitDraftInput input) async {
+    _validateSplitDraft(input);
+    final nowMs = _now().millisecondsSinceEpoch;
+
+    await _db.transaction(() async {
+      final existing = await (_db.select(
+        _db.splits,
+      )..where((tbl) => tbl.id.equals(splitId))).getSingleOrNull();
+      if (existing == null) {
+        throw ArgumentError('Split not found: $splitId');
+      }
+
+      await (_db.update(
+        _db.splits,
+      )..where((tbl) => tbl.id.equals(splitId))).write(
+        SplitsCompanion(name: Value(input.name.trim()), updatedAt: Value(nowMs)),
+      );
+
+      await (_db.delete(
+        _db.dayPlans,
+      )..where((tbl) => tbl.splitId.equals(splitId))).go();
+
+      final orderedDays = [...input.days]
+        ..sort((a, b) => a.dayIndex.compareTo(b.dayIndex));
+      for (final day in orderedDays) {
+        final dayPlanId = _uuid.v4();
+        await _db
+            .into(_db.dayPlans)
+            .insert(
+              DayPlansCompanion.insert(
+                id: dayPlanId,
+                splitId: splitId,
+                dayIndex: day.dayIndex,
+                title: day.title.trim(),
+                createdAt: nowMs,
+                updatedAt: nowMs,
+              ),
+            );
+
+        final orderedExercises = [...day.plannedExercises]
+          ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+        for (final exercise in orderedExercises) {
+          await _db
+              .into(_db.plannedExercises)
+              .insert(
+                PlannedExercisesCompanion.insert(
+                  id: _uuid.v4(),
+                  dayPlanId: dayPlanId,
+                  exerciseId: exercise.exerciseId,
+                  orderIndex: exercise.orderIndex,
+                  targetSets: exercise.targetSets,
+                  repMin: exercise.repMin,
+                  repMax: exercise.repMax,
+                  restSeconds: Value(exercise.restSeconds),
+                  targetRpe: Value(exercise.targetRpe),
+                  createdAt: nowMs,
+                  updatedAt: nowMs,
+                ),
+              );
+        }
+      }
+    });
   }
 
   @override

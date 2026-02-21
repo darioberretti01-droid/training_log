@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/state/providers.dart';
@@ -12,12 +13,21 @@ class SplitsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final splitsState = ref.watch(splitsProvider);
 
-    return splitsState.when(
-      data: (splits) => _SplitsContent(splits: splits),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => _SplitsErrorState(
-        message: 'Failed to load splits: $error',
-        onRetry: () => ref.invalidate(splitsProvider),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        context.go('/home');
+      },
+      child: splitsState.when(
+        data: (splits) => _SplitsContent(splits: splits),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => _SplitsErrorState(
+          message: 'Failed to load splits: $error',
+          onRetry: () => ref.invalidate(splitsProvider),
+        ),
       ),
     );
   }
@@ -57,8 +67,8 @@ class _SplitsContent extends StatelessWidget {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
-              child: Text(
-                'No splits created yet. Tap + to create your first split.',
+               child: Text(
+                'No splits created yet. Tap ADD SPLIT to create your first split.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
@@ -83,16 +93,15 @@ class _CurrentSplitCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: split == null
             ? const Text('No active split selected.')
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    split!.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(_dayCountLabel(split!.dayCount)),
-                ],
+            : ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  split!.name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                subtitle: Text(_dayCountLabel(split!.dayCount)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/splits/${split!.id}'),
               ),
       ),
     );
@@ -114,11 +123,18 @@ class _SplitListCard extends StatelessWidget {
           '${_dayCountLabel(split.dayCount)} | Updated ${DateFormat('yyyy-MM-dd HH:mm').format(updatedAt)}',
         ),
         trailing: split.isActive
-            ? const Chip(
-                label: Text('Active'),
-                visualDensity: VisualDensity.compact,
+            ? const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Chip(
+                    label: Text('Active'),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  Icon(Icons.chevron_right),
+                ],
               )
-            : null,
+            : const Icon(Icons.chevron_right),
+        onTap: () => context.push('/splits/${split.id}'),
       ),
     );
   }

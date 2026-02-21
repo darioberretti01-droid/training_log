@@ -113,25 +113,39 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
         }
         context.go('/home');
       },
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildPossiblyBlurredTopControls(context, addActionColor),
-          const SizedBox(height: 10),
-          _buildToolbarLine(context),
-          const SizedBox(height: 12),
-          if (sections.isEmpty)
-            const Card(
-              child: Padding(
-                padding: EdgeInsets.all(14),
-                child: Text('No exercises match the current filter.'),
-              ),
-            )
-          else
-            ...sections.map((section) => _buildSection(context, section)),
-        ],
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _clearTransientSelections,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildPossiblyBlurredTopControls(context, addActionColor),
+            const SizedBox(height: 10),
+            _buildToolbarLine(context),
+            const SizedBox(height: 12),
+            if (sections.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Text('No exercises match the current filter.'),
+                ),
+              )
+            else
+              ...sections.map((section) => _buildSection(context, section)),
+          ],
+        ),
       ),
     );
+  }
+
+  void _clearTransientSelections() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (_isDeleteMode || _armedExerciseId != null) {
+      setState(() {
+        _isDeleteMode = false;
+        _armedExerciseId = null;
+      });
+    }
   }
 
   Widget _buildPossiblyBlurredTopControls(BuildContext context, Color addActionColor) {
@@ -172,6 +186,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
       onChanged: (value) {
         setState(() => _query = value.trim().toLowerCase());
       },
+      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
     );
   }
 
@@ -464,7 +479,15 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
         children: [
           Text(section.title, style: titleStyle),
           const SizedBox(height: 8),
-          if (_isDeleteMode)
+          if (_presentation == _ExercisePresentation.pills)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: section.items
+                  .map((item) => _buildExercisePill(context, item))
+                  .toList(growable: false),
+            )
+          else if (_isDeleteMode)
             Card(
               margin: EdgeInsets.zero,
               child: Column(
@@ -481,22 +504,6 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                   );
                 }),
               ),
-            )
-          else if (_presentation == _ExercisePresentation.pills)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: section.items
-                  .map(
-                    (item) => ActionChip(
-                      key: Key('exercise_pill_${item.exercise.id}'),
-                      label: Text(item.exercise.name),
-                      onPressed: _isMutating
-                          ? null
-                          : () => context.push('/exercises/${item.exercise.id}/history'),
-                    ),
-                  )
-                  .toList(growable: false),
             )
           else
             Card(
@@ -517,7 +524,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                             : Text(item.exercise.labels.join(', ')),
                         onTap: _isMutating
                             ? null
-                            : () => context.push('/exercises/${item.exercise.id}/history'),
+                            : () => _handleExercisePressed(context, item.exercise),
                       ),
                       if (!isLast) const Divider(height: 1),
                     ],
@@ -527,6 +534,23 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildExercisePill(BuildContext context, _ExerciseListItem item) {
+    final exercise = item.exercise;
+    return ActionChip(
+      key: Key('exercise_pill_${exercise.id}'),
+      label: Text(exercise.name),
+      onPressed: _isMutating
+          ? null
+          : () {
+              if (_isDeleteMode) {
+                _onDeleteModeExerciseTap(exercise);
+              } else {
+                _handleExercisePressed(context, exercise);
+              }
+            },
     );
   }
 
@@ -558,14 +582,24 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
             ),
       onTap: _isMutating
           ? null
-          : () {
-              if (exercise.isStandard) {
-                _confirmHideOrRestoreStandardExercise(exercise);
-              } else {
-                _confirmDeleteCustomExercise(exercise);
-              }
-            },
+          : () => _onDeleteModeExerciseTap(exercise),
     );
+  }
+
+  void _onDeleteModeExerciseTap(ExerciseWithLabels exercise) {
+    if (exercise.isStandard) {
+      _confirmHideOrRestoreStandardExercise(exercise);
+      return;
+    }
+    _confirmDeleteCustomExercise(exercise);
+  }
+
+  void _handleExercisePressed(BuildContext context, ExerciseWithLabels exercise) {
+    if (_showHiddenExercises && exercise.isStandard && exercise.isHidden) {
+      _confirmHideOrRestoreStandardExercise(exercise);
+      return;
+    }
+    context.push('/exercises/${exercise.id}/history');
   }
 
   Future<void> _confirmDeleteCustomExercise(ExerciseWithLabels exercise) async {
@@ -626,7 +660,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
       builder: (context) {
         if (exercise.isHidden) {
           return AlertDialog(
-            content: const Text('Restore this hidden standard exercise?'),
+            content: const Text('Do you want to restore this exercise?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),

@@ -128,6 +128,44 @@ void main() {
     expect(find.text('Pull-Up'), findsOneWidget);
   });
 
+  testWidgets('delete mode keeps pills format when pills selected', (tester) async {
+    await _pumpExerciseList(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(id: 'alpha', name: 'Alpha Press', labels: ['chest']),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('exercises_delete_mode_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('exercise_pill_alpha')), findsOneWidget);
+    expect(find.byKey(const Key('exercise_delete_tile_alpha')), findsNothing);
+    expect(find.byType(ActionChip), findsWidgets);
+  });
+
+  testWidgets('delete mode keeps list format when list selected', (tester) async {
+    await _pumpExerciseList(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(id: 'alpha', name: 'Alpha Press', labels: ['chest']),
+      ],
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('exercises_view_toggle')),
+        matching: find.byIcon(Icons.view_list_outlined),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('exercises_delete_mode_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('exercise_delete_tile_alpha')), findsOneWidget);
+    expect(find.byKey(const Key('exercise_delete_pill_alpha')), findsNothing);
+  });
+
   testWidgets('delete mode shows hide/delete trailing actions', (tester) async {
     await _pumpExerciseList(
       tester,
@@ -147,6 +185,13 @@ void main() {
       ],
     );
 
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('exercises_view_toggle')),
+        matching: find.byIcon(Icons.view_list_outlined),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('exercises_delete_mode_button')));
     await tester.pumpAndSettle();
 
@@ -155,6 +200,55 @@ void main() {
       find.byKey(const Key('exercise_delete_custom_mobility')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('tapping hidden exercise shows restore dialog', (tester) async {
+    await _pumpExerciseList(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(
+          id: 'bench_press',
+          name: 'Barbell Bench Press',
+          labels: ['chest', 'push'],
+          isStandard: true,
+          isHidden: true,
+        ),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('exercises_toggle_hidden_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Barbell Bench Press'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Do you want to restore this exercise?'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Restore'), findsOneWidget);
+  });
+
+  testWidgets('tapping empty area clears delete mode selection', (tester) async {
+    await _pumpExerciseList(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(id: 'alpha', name: 'Alpha Press', labels: ['chest']),
+      ],
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('exercises_view_toggle')),
+        matching: find.byIcon(Icons.view_list_outlined),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('exercises_delete_mode_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('exercise_delete_tile_alpha')), findsOneWidget);
+
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('exercise_delete_tile_alpha')), findsNothing);
+    expect(find.byKey(const Key('exercise_list_alpha')), findsOneWidget);
   });
 
   testWidgets('narrow layout does not overflow controls', (tester) async {

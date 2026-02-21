@@ -7,7 +7,9 @@ import '../../core/state/providers.dart';
 import 'split_repository.dart';
 
 class SplitBuilderScreen extends ConsumerStatefulWidget {
-  const SplitBuilderScreen({super.key});
+  const SplitBuilderScreen({super.key, this.editingSplitId});
+
+  final String? editingSplitId;
 
   @override
   ConsumerState<SplitBuilderScreen> createState() => _SplitBuilderScreenState();
@@ -18,6 +20,7 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
   final List<_DayDraft> _days = [_DayDraft()];
   bool _setAsActive = true;
   bool _isSaving = false;
+  bool _didHydrateFromExisting = false;
   String? _validationMessage;
 
   @override
@@ -31,11 +34,14 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final seedState = ref.watch(seedDataProvider);
+    final isEditing = widget.editingSplitId != null;
+    final splitDetailsState = isEditing
+        ? ref.watch(splitDetailsProvider(widget.editingSplitId!))
+        : const AsyncValue<SplitDetails?>.data(null);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Split Builder'),
+        title: Text(isEditing ? 'Edit Split' : 'Split Builder'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -53,30 +59,125 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
           ),
         ],
       ),
-      body: seedState.when(
-        data: (_) {
-          final exercisesState = ref.watch(exercisesProvider);
-          return exercisesState.when(
-            data: (exercises) {
-              final visibleExercises = exercises
-                  .where((exercise) => !exercise.isHidden)
-                  .toList(growable: false);
-              return _buildBody(context, visibleExercises);
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => _BuilderErrorState(
-              message: 'Failed to load exercises: $error',
-              onRetry: () => ref.invalidate(exercisesProvider),
-            ),
-          );
+      body: splitDetailsState.when(
+        data: (details) {
+          if (isEditing) {
+            if (details == null) {
+              return _BuilderErrorState(
+                message: 'Split not found.',
+                onRetry: () {
+                  ref.invalidate(splitDetailsProvider(widget.editingSplitId!));
+                },
+              );
+            }
+
+            if (!_didHydrateFromExisting) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted || _didHydrateFromExisting) {
+                  return;
+                }
+                _hydrateFromSplitDetails(details);
+              });
+              return const Center(child: CircularProgressIndicator());
+            }
+          }
+
+          return _buildSeedAndExercisesBody();
         },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => _BuilderErrorState(
+          message: 'Failed to load split details: $error',
+          onRetry: () {
+            if (widget.editingSplitId != null) {
+              ref.invalidate(splitDetailsProvider(widget.editingSplitId!));
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeedAndExercisesBody() {
+    final seedState = ref.watch(seedDataProvider);
+    return seedState.when(
+      data: (_) {
+        final exercisesState = ref.watch(exercisesProvider);
+        return exercisesState.when(
+          data: (exercises) {
+            final visibleExercises = _filterExercisesForBuilder(exercises);
+            return _buildBody(context, visibleExercises);
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => _BuilderErrorState(
+            message: 'Failed to load exercises: $error',
+            onRetry: () => ref.invalidate(exercisesProvider),
+          ),
+        );
+      },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _BuilderErrorState(
           message: 'Failed to initialize exercise data: $error',
           onRetry: () => ref.invalidate(seedDataProvider),
         ),
-      ),
-    );
+      );
+  }
+
+  List<ExerciseWithLabels> _filterExercisesForBuilder(
+    List<ExerciseWithLabels> exercises,
+  ) {
+    final selectedExerciseIds = <String>{};
+    for (final day in _days) {
+      for (final planned in day.plannedExercises) {
+        final selectedExerciseId = planned.selectedExerciseId;
+        if (selectedExerciseId != null && selectedExerciseId.isNotEmpty) {
+          selectedExerciseIds.add(selectedExerciseId);
+        }
+      }
+    }
+
+    return exercises
+        .where(
+          (exercise) => !exercise.isHidden || selectedExerciseIds.contains(exercise.id),
+        )
+        .toList(growable: false);
+  }
+
+  void _hydrateFromSplitDetails(SplitDetails details) {
+    _splitNameController.text = details.name;
+    _setAsActive = details.isActive;
+
+    for (final day in _days) {
+      day.dispose();
+    }
+    _days.clear();
+    for (final day in details.days) {
+      final plannedExercises = day.plannedExercises
+          .map(
+            (planned) => _PlannedExerciseDraft(
+              selectedExerciseId: planned.exerciseId,
+              sets: planned.targetSets.toString(),
+              repMin: planned.repMin.toString(),
+              repMax: planned.repMax.toString(),
+              rest: planned.restSeconds?.toString() ?? '',
+              rpe: planned.targetRpe?.toString() ?? '',
+            ),
+          )
+          .toList(growable: false);
+
+      _days.add(
+        _DayDraft(
+          title: day.title,
+          plannedExercises: plannedExercises,
+        ),
+      );
+    }
+    if (_days.isEmpty) {
+      _days.add(_DayDraft());
+    }
+
+    setState(() {
+      _didHydrateFromExisting = true;
+    });
   }
 
   Widget _buildBody(BuildContext context, List<ExerciseWithLabels> exercises) {
@@ -190,10 +291,20 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
     setState(() => _isSaving = true);
     try {
       final repository = ref.read(splitRepositoryProvider);
-      final splitId = await repository.createSplit(input);
+      final isEditing = widget.editingSplitId != null;
+      late final String splitId;
+      if (isEditing) {
+        splitId = widget.editingSplitId!;
+        await repository.updateSplit(splitId, input);
+      } else {
+        splitId = await repository.createSplit(input);
+      }
       if (_setAsActive) {
         await repository.setActiveSplit(splitId);
       }
+
+      ref.invalidate(splitsProvider);
+      ref.invalidate(splitDetailsProvider(splitId));
 
       if (!mounted) {
         return;
@@ -202,8 +313,10 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
         SnackBar(
           content: Text(
             _setAsActive
-                ? 'Saved split and set it active.'
-                : 'Saved split successfully.',
+                ? (isEditing
+                      ? 'Saved split changes and set it active.'
+                      : 'Saved split and set it active.')
+                : (isEditing ? 'Saved split changes.' : 'Saved split successfully.'),
           ),
         ),
       );
@@ -646,6 +759,7 @@ class _DayDraft {
 
 class _PlannedExerciseDraft {
   _PlannedExerciseDraft({
+    this.selectedExerciseId,
     String sets = '3',
     String repMin = '8',
     String repMax = '12',

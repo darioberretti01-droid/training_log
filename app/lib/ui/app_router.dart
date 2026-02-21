@@ -8,6 +8,7 @@ import '../features/exercises/exercise_list_screen.dart';
 import '../features/exercises/labels_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/splits/split_builder_screen.dart';
+import '../features/splits/split_detail_screen.dart';
 import '../features/splits/splits_screen.dart';
 import '../features/workouts/quick_workout_screen.dart';
 import 'root_shell.dart';
@@ -28,6 +29,22 @@ final appRouter = GoRouter(
             GoRoute(
               path: 'builder',
               builder: (context, state) => const SplitBuilderScreen(),
+            ),
+            GoRoute(
+              path: ':splitId',
+              builder: (context, state) {
+                final splitId = state.pathParameters['splitId']!;
+                return SplitDetailScreen(splitId: splitId);
+              },
+              routes: [
+                GoRoute(
+                  path: 'edit',
+                  builder: (context, state) {
+                    final splitId = state.pathParameters['splitId']!;
+                    return SplitBuilderScreen(editingSplitId: splitId);
+                  },
+                ),
+              ],
             ),
           ],
         ),

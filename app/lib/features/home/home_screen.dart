@@ -187,19 +187,28 @@ class OtherTabContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          child: ListTile(
-            key: const Key('other_labels_item'),
-            title: const Text('Labels'),
-            subtitle: const Text('Browse and create labels'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/other/labels'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        context.go('/home');
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            child: ListTile(
+              key: const Key('other_labels_item'),
+              title: const Text('Labels'),
+              subtitle: const Text('Browse and create labels'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/other/labels'),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

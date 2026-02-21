@@ -197,6 +197,75 @@ void main() {
     );
   });
 
+  test('updateSplit replaces days and planned exercises', () async {
+    final exercises = await _seedExercises(exerciseRepository);
+    final splitId = await splitRepository.createSplit(
+      SplitDraftInput(
+        name: 'Original',
+        days: [
+          DayPlanDraftInput(
+            dayIndex: 1,
+            title: 'Day 1',
+            plannedExercises: [
+              PlannedExerciseDraftInput(
+                orderIndex: 1,
+                exerciseId: exercises[0].id,
+                targetSets: 3,
+                repMin: 6,
+                repMax: 10,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    nowMs = DateTime(2026, 2, 20, 11, 0).millisecondsSinceEpoch;
+    await splitRepository.updateSplit(
+      splitId,
+      SplitDraftInput(
+        name: 'Updated',
+        days: [
+          DayPlanDraftInput(
+            dayIndex: 1,
+            title: 'Upper A',
+            plannedExercises: [
+              PlannedExerciseDraftInput(
+                orderIndex: 1,
+                exerciseId: exercises[1].id,
+                targetSets: 4,
+                repMin: 5,
+                repMax: 8,
+              ),
+            ],
+          ),
+          DayPlanDraftInput(
+            dayIndex: 2,
+            title: 'Lower A',
+            plannedExercises: [
+              PlannedExerciseDraftInput(
+                orderIndex: 1,
+                exerciseId: exercises[2].id,
+                targetSets: 3,
+                repMin: 8,
+                repMax: 12,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final details = await splitRepository.getSplitById(splitId);
+    expect(details, isNotNull);
+    expect(details!.name, 'Updated');
+    expect(details.days, hasLength(2));
+    expect(details.days[0].title, 'Upper A');
+    expect(details.days[1].title, 'Lower A');
+    expect(details.days[0].plannedExercises.single.exerciseId, exercises[1].id);
+    expect(details.days[1].plannedExercises.single.exerciseId, exercises[2].id);
+  });
+
   test('watchSplits returns splits ordered by updatedAt desc', () async {
     final exercises = await _seedExercises(exerciseRepository);
 

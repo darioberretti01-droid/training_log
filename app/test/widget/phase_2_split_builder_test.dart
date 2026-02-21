@@ -96,6 +96,75 @@ void main() {
     expect(find.text('Barbell Bench Press'), findsWidgets);
     expect(find.text('Pull-Up'), findsNothing);
   });
+
+  testWidgets('editing split preloads values and calls updateSplit', (
+    tester,
+  ) async {
+    final repository = _FakeSplitRepository()
+      ..detailsById['split_1'] = const SplitDetails(
+        id: 'split_1',
+        name: 'Upper Lower',
+        isActive: true,
+        createdAt: 1,
+        updatedAt: 1,
+        days: [
+          DayPlanDetails(
+            id: 'day_1',
+            dayIndex: 1,
+            title: 'Upper A',
+            plannedExercises: [
+              PlannedExerciseDetails(
+                id: 'planned_1',
+                orderIndex: 1,
+                exerciseId: 'bench_press',
+                exerciseName: 'Barbell Bench Press',
+                targetSets: 3,
+                repMin: 8,
+                repMax: 12,
+                restSeconds: null,
+                targetRpe: null,
+              ),
+            ],
+          ),
+        ],
+      );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith(
+            (ref) => Stream.value(const [
+              ExerciseWithLabels(
+                id: 'bench_press',
+                name: 'Barbell Bench Press',
+                labels: ['push', 'chest'],
+              ),
+            ]),
+          ),
+          splitRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(
+          home: SplitBuilderScreen(editingSplitId: 'split_1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Split'), findsOneWidget);
+    expect(find.text('Upper Lower'), findsOneWidget);
+    expect(find.text('Upper A'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('split_name_field')), 'Updated UL');
+    await tester.tap(find.byKey(const Key('split_builder_save')));
+    await tester.pumpAndSettle();
+
+    expect(repository.updateCalls, 1);
+    expect(repository.lastUpdatedSplitId, 'split_1');
+    expect(repository.lastUpdatedInput, isNotNull);
+    expect(repository.lastUpdatedInput!.name, 'Updated UL');
+    expect(repository.createCalls, 0);
+  });
 }
 
 Future<void> _pumpSplitBuilder(
@@ -125,8 +194,12 @@ Future<void> _pumpSplitBuilder(
 
 class _FakeSplitRepository implements SplitRepository {
   int createCalls = 0;
+  int updateCalls = 0;
   int setActiveCalls = 0;
   SplitDraftInput? lastInput;
+  String? lastUpdatedSplitId;
+  SplitDraftInput? lastUpdatedInput;
+  final Map<String, SplitDetails> detailsById = {};
 
   @override
   Future<String> createSplit(SplitDraftInput input) async {
@@ -139,11 +212,18 @@ class _FakeSplitRepository implements SplitRepository {
   Future<void> deleteSplit(String splitId) async {}
 
   @override
-  Future<SplitDetails?> getSplitById(String splitId) async => null;
+  Future<SplitDetails?> getSplitById(String splitId) async => detailsById[splitId];
 
   @override
   Future<void> setActiveSplit(String splitId) async {
     setActiveCalls += 1;
+  }
+
+  @override
+  Future<void> updateSplit(String splitId, SplitDraftInput input) async {
+    updateCalls += 1;
+    lastUpdatedSplitId = splitId;
+    lastUpdatedInput = input;
   }
 
   @override

@@ -96,12 +96,19 @@ class RootShell extends StatelessWidget {
 
   List<Widget>? _actionsForIndex(int index, BuildContext context) {
     if (index == 1) {
+      final actionColor = Theme.of(context).colorScheme.primary;
       return [
-        IconButton(
-          key: const Key('splits_add_button'),
-          tooltip: 'Create split',
-          onPressed: () => context.push('/splits/builder'),
-          icon: const Icon(Icons.add_circle, size: 36),
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ActionChip(
+            key: const Key('splits_add_button'),
+            avatar: Icon(Icons.add, size: 18, color: actionColor),
+            label: Text(
+              'ADD SPLIT',
+              style: TextStyle(color: actionColor),
+            ),
+            onPressed: () => context.push('/splits/builder'),
+          ),
         ),
       ];
     }

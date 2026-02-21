@@ -14,6 +14,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith((ref) => Stream.value(const [])),
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
         ],
@@ -30,6 +32,7 @@ void main() {
     expect(find.text('Upper Lower'), findsNWidgets(2));
     expect(find.text('Push Pull Legs'), findsOneWidget);
     expect(find.byKey(const Key('splits_add_button')), findsOneWidget);
+    expect(find.text('ADD SPLIT'), findsOneWidget);
   });
 
   testWidgets('splits add button opens split builder', (tester) async {
@@ -61,6 +64,119 @@ void main() {
 
     expect(find.text('Split Builder'), findsOneWidget);
   });
+
+  testWidgets('back from splits root returns to home', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith((ref) => Stream.value(const [])),
+          splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
+          recentHomeSessionsProvider.overrideWith((ref) async => const []),
+        ],
+        child: const TrainingLogApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.view_week_outlined));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('Splits')),
+      findsOneWidget,
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('Home')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('back from other root returns to home', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith((ref) => Stream.value(const [])),
+          splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
+          recentHomeSessionsProvider.overrideWith((ref) async => const []),
+        ],
+        child: const TrainingLogApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_horiz));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('Other')),
+      findsOneWidget,
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('Home')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('tapping split opens split details screen', (tester) async {
+    final repository = _FakeSplitRepository()
+      ..detailsById['split_1'] = const SplitDetails(
+        id: 'split_1',
+        name: 'Upper Lower',
+        isActive: true,
+        createdAt: 1,
+        updatedAt: 2,
+        days: [
+          DayPlanDetails(
+            id: 'day_1',
+            dayIndex: 1,
+            title: 'Upper A',
+            plannedExercises: [
+              PlannedExerciseDetails(
+                id: 'plan_1',
+                orderIndex: 1,
+                exerciseId: 'bench_press',
+                exerciseName: 'Barbell Bench Press',
+                targetSets: 3,
+                repMin: 8,
+                repMax: 12,
+                restSeconds: null,
+                targetRpe: null,
+              ),
+            ],
+          ),
+        ],
+      );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith((ref) => Stream.value(const [])),
+          splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
+          splitRepositoryProvider.overrideWithValue(repository),
+          recentHomeSessionsProvider.overrideWith((ref) async => const []),
+        ],
+        child: const TrainingLogApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.view_week_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upper Lower').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Days'), findsOneWidget);
+    expect(find.byKey(const Key('split_detail_edit')), findsOneWidget);
+    expect(find.byKey(const Key('split_detail_delete')), findsOneWidget);
+  });
 }
 
 final _sampleSplits = [
@@ -79,3 +195,25 @@ final _sampleSplits = [
     updatedAt: 2,
   ),
 ];
+
+class _FakeSplitRepository implements SplitRepository {
+  final Map<String, SplitDetails> detailsById = {};
+
+  @override
+  Future<String> createSplit(SplitDraftInput input) async => 'split_new';
+
+  @override
+  Future<void> deleteSplit(String splitId) async {}
+
+  @override
+  Future<SplitDetails?> getSplitById(String splitId) async => detailsById[splitId];
+
+  @override
+  Future<void> setActiveSplit(String splitId) async {}
+
+  @override
+  Future<void> updateSplit(String splitId, SplitDraftInput input) async {}
+
+  @override
+  Stream<List<SplitSummary>> watchSplits() => Stream.value(_sampleSplits);
+}
