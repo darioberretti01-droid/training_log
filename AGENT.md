@@ -15,7 +15,7 @@ This file defines how contributors (human or AI) should work in this repository.
 
 When code and docs diverge, update docs in the same branch before commit.
 
-## 3. Required Workflow Before Every Commit
+## 3. Pre-Commit Checklist
 1. Confirm scope matches the current phase/milestone.
 2. Update docs if any of the following changed:
    - data model or persistence behavior
