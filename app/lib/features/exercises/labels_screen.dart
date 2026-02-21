@@ -11,7 +11,7 @@ class LabelsScreen extends ConsumerStatefulWidget {
   ConsumerState<LabelsScreen> createState() => _LabelsScreenState();
 }
 
-enum _UndoType { addLabel, hideStandard, deleteCustom }
+enum _UndoType { addLabel, hideStandard, unhideStandard, deleteCustom }
 
 class _UndoOperation {
   const _UndoOperation.addLabel(this.labelName)
@@ -20,6 +20,10 @@ class _UndoOperation {
 
   const _UndoOperation.hideStandard(this.labelName)
     : type = _UndoType.hideStandard,
+      deletedSnapshot = null;
+
+  const _UndoOperation.unhideStandard(this.labelName)
+    : type = _UndoType.unhideStandard,
       deletedSnapshot = null;
 
   const _UndoOperation.deleteCustom(this.deletedSnapshot)
@@ -338,7 +342,12 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     }
     setState(() => _isMutating = true);
     try {
-      await ref.read(exerciseRepositoryProvider).unhideStandardLabel(entry.name);
+      final unhidden = await ref
+          .read(exerciseRepositoryProvider)
+          .unhideStandardLabel(entry.name);
+      if (unhidden) {
+        _undoStack.add(_UndoOperation.unhideStandard(entry.name));
+      }
     } finally {
       if (mounted) {
         setState(() => _isMutating = false);
@@ -361,6 +370,9 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
           break;
         case _UndoType.hideStandard:
           await repository.unhideStandardLabel(operation.labelName!);
+          break;
+        case _UndoType.unhideStandard:
+          await repository.hideStandardLabel(operation.labelName!);
           break;
         case _UndoType.deleteCustom:
           await repository.restoreDeletedCustomLabel(operation.deletedSnapshot!);

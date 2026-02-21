@@ -91,18 +91,43 @@ void main() {
     expect(find.text('push'), findsOneWidget);
     expect(find.byKey(const Key('label_restore_push')), findsOneWidget);
   });
+
+  testWidgets('restore then undo re-hides hidden standard label', (tester) async {
+    final repository = _FakeExerciseRepository();
+    await _pumpLabelsScreen(
+      tester,
+      catalog: const [
+        LabelCatalogEntry(name: 'push', isStandard: true, isHidden: true),
+      ],
+      repository: repository,
+    );
+
+    await tester.tap(find.byKey(const Key('labels_toggle_hidden_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('label_restore_push')));
+    await tester.pumpAndSettle();
+
+    expect(repository.unhiddenLabels, contains('push'));
+
+    await tester.tap(find.byKey(const Key('labels_undo_button')));
+    await tester.pumpAndSettle();
+
+    expect(repository.hiddenLabels, contains('push'));
+  });
 }
 
 Future<void> _pumpLabelsScreen(
   WidgetTester tester, {
   required List<LabelCatalogEntry> catalog,
+  _FakeExerciseRepository? repository,
 }) async {
+  final fakeRepository = repository ?? _FakeExerciseRepository();
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         seedDataProvider.overrideWith((ref) async {}),
         labelCatalogProvider.overrideWith((ref) => Stream.value(catalog)),
-        exerciseRepositoryProvider.overrideWithValue(_FakeExerciseRepository()),
+        exerciseRepositoryProvider.overrideWithValue(fakeRepository),
         allLabelsProvider.overrideWith((ref) => Stream.value(const ['push'])),
         exercisesProvider.overrideWith((ref) => Stream.value(const <ExerciseWithLabels>[])),
       ],
@@ -113,6 +138,9 @@ Future<void> _pumpLabelsScreen(
 }
 
 class _FakeExerciseRepository implements ExerciseRepository {
+  final List<String> hiddenLabels = [];
+  final List<String> unhiddenLabels = [];
+
   @override
   Future<String> createExercise({
     required String name,
@@ -133,7 +161,10 @@ class _FakeExerciseRepository implements ExerciseRepository {
   Future<List<String>> getAllLabels() async => const [];
 
   @override
-  Future<bool> hideStandardLabel(String label) async => true;
+  Future<bool> hideStandardLabel(String label) async {
+    hiddenLabels.add(label);
+    return true;
+  }
 
   @override
   Future<void> restoreDeletedCustomLabel(
@@ -153,7 +184,10 @@ class _FakeExerciseRepository implements ExerciseRepository {
   Future<void> seedIfEmpty() async {}
 
   @override
-  Future<bool> unhideStandardLabel(String label) async => true;
+  Future<bool> unhideStandardLabel(String label) async {
+    unhiddenLabels.add(label);
+    return true;
+  }
 
   @override
   Stream<List<String>> watchAllLabels() => Stream.value(const []);
