@@ -23,6 +23,12 @@ void main() {
               ),
             ]),
           ),
+          exerciseCreatedAtMapProvider.overrideWith(
+            (ref) => Stream.value(const {'bench_press': 1}),
+          ),
+          exerciseLogCountMapProvider.overrideWith(
+            (ref) => Stream.value(const {'bench_press': 0}),
+          ),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
         ],
         child: const TrainingLogApp(),

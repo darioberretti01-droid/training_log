@@ -70,7 +70,12 @@ void main() {
       },
     );
 
-    await tester.tap(find.text('List'));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('exercises_view_toggle')),
+        matching: find.byIcon(Icons.view_list_outlined),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('exercises_order_dropdown')));
     await tester.pumpAndSettle();
@@ -91,6 +96,65 @@ void main() {
     final betaAfter =
         tester.getTopLeft(find.byKey(const Key('exercise_list_beta'))).dy;
     expect(alphaAfter, greaterThan(betaAfter));
+  });
+
+  testWidgets('hidden toggle shows hidden exercises only', (tester) async {
+    await _pumpExerciseList(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(
+          id: 'bench_press',
+          name: 'Barbell Bench Press',
+          labels: ['chest', 'push'],
+          isStandard: true,
+        ),
+        ExerciseWithLabels(
+          id: 'pull_up',
+          name: 'Pull-Up',
+          labels: ['back', 'pull'],
+          isStandard: true,
+          isHidden: true,
+        ),
+      ],
+    );
+
+    expect(find.text('Barbell Bench Press'), findsOneWidget);
+    expect(find.text('Pull-Up'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('exercises_toggle_hidden_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Barbell Bench Press'), findsNothing);
+    expect(find.text('Pull-Up'), findsOneWidget);
+  });
+
+  testWidgets('delete mode shows hide/delete trailing actions', (tester) async {
+    await _pumpExerciseList(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(
+          id: 'bench_press',
+          name: 'Barbell Bench Press',
+          labels: ['chest', 'push'],
+          isStandard: true,
+        ),
+        ExerciseWithLabels(
+          id: 'custom_mobility',
+          name: 'Ankle Mobility',
+          labels: ['mobility'],
+          isStandard: false,
+        ),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('exercises_delete_mode_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('exercise_hide_bench_press')), findsOneWidget);
+    expect(
+      find.byKey(const Key('exercise_delete_custom_mobility')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('narrow layout does not overflow controls', (tester) async {
@@ -126,6 +190,7 @@ void main() {
     expect((divisionCenter.dy - addCenter.dy).abs(), lessThan(6));
     expect(addCenter.dx, greaterThan(divisionCenter.dx));
     expect(find.byKey(const Key('exercises_order_dropdown')), findsOneWidget);
+    expect(find.byKey(const Key('exercises_toggle_hidden_button')), findsOneWidget);
   });
 }
 

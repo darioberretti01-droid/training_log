@@ -1041,6 +1041,192 @@ class HiddenStandardLabelsCompanion
   }
 }
 
+class $HiddenStandardExercisesTable extends HiddenStandardExercises
+    with TableInfo<$HiddenStandardExercisesTable, HiddenStandardExercise> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HiddenStandardExercisesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _standardExerciseIdMeta =
+      const VerificationMeta('standardExerciseId');
+  @override
+  late final GeneratedColumn<String> standardExerciseId =
+      GeneratedColumn<String>(
+        'standard_exercise_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [standardExerciseId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'hidden_standard_exercises';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<HiddenStandardExercise> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('standard_exercise_id')) {
+      context.handle(
+        _standardExerciseIdMeta,
+        standardExerciseId.isAcceptableOrUnknown(
+          data['standard_exercise_id']!,
+          _standardExerciseIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_standardExerciseIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {standardExerciseId};
+  @override
+  HiddenStandardExercise map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return HiddenStandardExercise(
+      standardExerciseId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}standard_exercise_id'],
+      )!,
+    );
+  }
+
+  @override
+  $HiddenStandardExercisesTable createAlias(String alias) {
+    return $HiddenStandardExercisesTable(attachedDatabase, alias);
+  }
+}
+
+class HiddenStandardExercise extends DataClass
+    implements Insertable<HiddenStandardExercise> {
+  final String standardExerciseId;
+  const HiddenStandardExercise({required this.standardExerciseId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['standard_exercise_id'] = Variable<String>(standardExerciseId);
+    return map;
+  }
+
+  HiddenStandardExercisesCompanion toCompanion(bool nullToAbsent) {
+    return HiddenStandardExercisesCompanion(
+      standardExerciseId: Value(standardExerciseId),
+    );
+  }
+
+  factory HiddenStandardExercise.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return HiddenStandardExercise(
+      standardExerciseId: serializer.fromJson<String>(
+        json['standardExerciseId'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'standardExerciseId': serializer.toJson<String>(standardExerciseId),
+    };
+  }
+
+  HiddenStandardExercise copyWith({String? standardExerciseId}) =>
+      HiddenStandardExercise(
+        standardExerciseId: standardExerciseId ?? this.standardExerciseId,
+      );
+  HiddenStandardExercise copyWithCompanion(
+    HiddenStandardExercisesCompanion data,
+  ) {
+    return HiddenStandardExercise(
+      standardExerciseId: data.standardExerciseId.present
+          ? data.standardExerciseId.value
+          : this.standardExerciseId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HiddenStandardExercise(')
+          ..write('standardExerciseId: $standardExerciseId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => standardExerciseId.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is HiddenStandardExercise &&
+          other.standardExerciseId == this.standardExerciseId);
+}
+
+class HiddenStandardExercisesCompanion
+    extends UpdateCompanion<HiddenStandardExercise> {
+  final Value<String> standardExerciseId;
+  final Value<int> rowid;
+  const HiddenStandardExercisesCompanion({
+    this.standardExerciseId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  HiddenStandardExercisesCompanion.insert({
+    required String standardExerciseId,
+    this.rowid = const Value.absent(),
+  }) : standardExerciseId = Value(standardExerciseId);
+  static Insertable<HiddenStandardExercise> custom({
+    Expression<String>? standardExerciseId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (standardExerciseId != null)
+        'standard_exercise_id': standardExerciseId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  HiddenStandardExercisesCompanion copyWith({
+    Value<String>? standardExerciseId,
+    Value<int>? rowid,
+  }) {
+    return HiddenStandardExercisesCompanion(
+      standardExerciseId: standardExerciseId ?? this.standardExerciseId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (standardExerciseId.present) {
+      map['standard_exercise_id'] = Variable<String>(standardExerciseId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HiddenStandardExercisesCompanion(')
+          ..write('standardExerciseId: $standardExerciseId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserExerciseDatabase extends GeneratedDatabase {
   _$UserExerciseDatabase(QueryExecutor e) : super(e);
   $UserExerciseDatabaseManager get managers =>
@@ -1052,6 +1238,8 @@ abstract class _$UserExerciseDatabase extends GeneratedDatabase {
       $UserExerciseLabelLinksTable(this);
   late final $HiddenStandardLabelsTable hiddenStandardLabels =
       $HiddenStandardLabelsTable(this);
+  late final $HiddenStandardExercisesTable hiddenStandardExercises =
+      $HiddenStandardExercisesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1061,6 +1249,7 @@ abstract class _$UserExerciseDatabase extends GeneratedDatabase {
     userExerciseLabels,
     userExerciseLabelLinks,
     hiddenStandardLabels,
+    hiddenStandardExercises,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -2224,6 +2413,151 @@ typedef $$HiddenStandardLabelsTableProcessedTableManager =
       HiddenStandardLabel,
       PrefetchHooks Function()
     >;
+typedef $$HiddenStandardExercisesTableCreateCompanionBuilder =
+    HiddenStandardExercisesCompanion Function({
+      required String standardExerciseId,
+      Value<int> rowid,
+    });
+typedef $$HiddenStandardExercisesTableUpdateCompanionBuilder =
+    HiddenStandardExercisesCompanion Function({
+      Value<String> standardExerciseId,
+      Value<int> rowid,
+    });
+
+class $$HiddenStandardExercisesTableFilterComposer
+    extends Composer<_$UserExerciseDatabase, $HiddenStandardExercisesTable> {
+  $$HiddenStandardExercisesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get standardExerciseId => $composableBuilder(
+    column: $table.standardExerciseId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$HiddenStandardExercisesTableOrderingComposer
+    extends Composer<_$UserExerciseDatabase, $HiddenStandardExercisesTable> {
+  $$HiddenStandardExercisesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get standardExerciseId => $composableBuilder(
+    column: $table.standardExerciseId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$HiddenStandardExercisesTableAnnotationComposer
+    extends Composer<_$UserExerciseDatabase, $HiddenStandardExercisesTable> {
+  $$HiddenStandardExercisesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get standardExerciseId => $composableBuilder(
+    column: $table.standardExerciseId,
+    builder: (column) => column,
+  );
+}
+
+class $$HiddenStandardExercisesTableTableManager
+    extends
+        RootTableManager<
+          _$UserExerciseDatabase,
+          $HiddenStandardExercisesTable,
+          HiddenStandardExercise,
+          $$HiddenStandardExercisesTableFilterComposer,
+          $$HiddenStandardExercisesTableOrderingComposer,
+          $$HiddenStandardExercisesTableAnnotationComposer,
+          $$HiddenStandardExercisesTableCreateCompanionBuilder,
+          $$HiddenStandardExercisesTableUpdateCompanionBuilder,
+          (
+            HiddenStandardExercise,
+            BaseReferences<
+              _$UserExerciseDatabase,
+              $HiddenStandardExercisesTable,
+              HiddenStandardExercise
+            >,
+          ),
+          HiddenStandardExercise,
+          PrefetchHooks Function()
+        > {
+  $$HiddenStandardExercisesTableTableManager(
+    _$UserExerciseDatabase db,
+    $HiddenStandardExercisesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HiddenStandardExercisesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$HiddenStandardExercisesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$HiddenStandardExercisesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> standardExerciseId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => HiddenStandardExercisesCompanion(
+                standardExerciseId: standardExerciseId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String standardExerciseId,
+                Value<int> rowid = const Value.absent(),
+              }) => HiddenStandardExercisesCompanion.insert(
+                standardExerciseId: standardExerciseId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$HiddenStandardExercisesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$UserExerciseDatabase,
+      $HiddenStandardExercisesTable,
+      HiddenStandardExercise,
+      $$HiddenStandardExercisesTableFilterComposer,
+      $$HiddenStandardExercisesTableOrderingComposer,
+      $$HiddenStandardExercisesTableAnnotationComposer,
+      $$HiddenStandardExercisesTableCreateCompanionBuilder,
+      $$HiddenStandardExercisesTableUpdateCompanionBuilder,
+      (
+        HiddenStandardExercise,
+        BaseReferences<
+          _$UserExerciseDatabase,
+          $HiddenStandardExercisesTable,
+          HiddenStandardExercise
+        >,
+      ),
+      HiddenStandardExercise,
+      PrefetchHooks Function()
+    >;
 
 class $UserExerciseDatabaseManager {
   final _$UserExerciseDatabase _db;
@@ -2239,4 +2573,9 @@ class $UserExerciseDatabaseManager {
       );
   $$HiddenStandardLabelsTableTableManager get hiddenStandardLabels =>
       $$HiddenStandardLabelsTableTableManager(_db, _db.hiddenStandardLabels);
+  $$HiddenStandardExercisesTableTableManager get hiddenStandardExercises =>
+      $$HiddenStandardExercisesTableTableManager(
+        _db,
+        _db.hiddenStandardExercises,
+      );
 }

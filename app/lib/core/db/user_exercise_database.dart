@@ -55,12 +55,21 @@ class HiddenStandardLabels extends Table {
   Set<Column<Object>>? get primaryKey => {labelName};
 }
 
+class HiddenStandardExercises extends Table {
+  TextColumn get standardExerciseId =>
+      text().named('standard_exercise_id')();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {standardExerciseId};
+}
+
 @DriftDatabase(
   tables: [
     UserExercises,
     UserExerciseLabels,
     UserExerciseLabelLinks,
     HiddenStandardLabels,
+    HiddenStandardExercises,
   ],
 )
 class UserExerciseDatabase extends _$UserExerciseDatabase {
@@ -68,7 +77,7 @@ class UserExerciseDatabase extends _$UserExerciseDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -76,6 +85,9 @@ class UserExerciseDatabase extends _$UserExerciseDatabase {
     onUpgrade: (m, from, to) async {
       if (from < 2) {
         await m.createTable(hiddenStandardLabels);
+      }
+      if (from < 3) {
+        await m.createTable(hiddenStandardExercises);
       }
     },
     beforeOpen: (details) async {

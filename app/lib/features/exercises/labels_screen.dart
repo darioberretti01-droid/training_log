@@ -11,34 +11,27 @@ class LabelsScreen extends ConsumerStatefulWidget {
   ConsumerState<LabelsScreen> createState() => _LabelsScreenState();
 }
 
-enum _UndoType { addLabel, hideStandard, unhideStandard, deleteCustom }
+enum _UndoType { addLabel, deleteCustom }
 
 class _UndoOperation {
-  const _UndoOperation.addLabel(this.labelName)
+  _UndoOperation.addLabel(this.labelName)
     : type = _UndoType.addLabel,
       deletedSnapshot = null;
 
-  const _UndoOperation.hideStandard(this.labelName)
-    : type = _UndoType.hideStandard,
-      deletedSnapshot = null;
-
-  const _UndoOperation.unhideStandard(this.labelName)
-    : type = _UndoType.unhideStandard,
-      deletedSnapshot = null;
-
-  const _UndoOperation.deleteCustom(this.deletedSnapshot)
+  _UndoOperation.deleteCustom(DeletedCustomLabelSnapshot snapshot)
     : type = _UndoType.deleteCustom,
-      labelName = null;
+      labelName = snapshot.labelName,
+      deletedSnapshot = snapshot;
 
   final _UndoType type;
-  final String? labelName;
+  final String labelName;
   final DeletedCustomLabelSnapshot? deletedSnapshot;
 }
 
 class _LabelsScreenState extends ConsumerState<LabelsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final List<_UndoOperation> _undoStack = [];
-  bool _showHidden = false;
+  final List<_UndoOperation> _redoStack = [];
   bool _isMutating = false;
   String _query = '';
 
@@ -60,7 +53,6 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
         data: (_) => catalogState.when(
           data: (catalog) {
             final filtered = _filteredCatalog(catalog);
-            final hiddenCount = catalog.where((entry) => entry.isHidden).length;
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -79,6 +71,11 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                       const TextSpan(text: '.'),
                     ],
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Only added labels can be deleted.',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -122,22 +119,11 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                       label: const Text('Undo'),
                     ),
                     OutlinedButton.icon(
-                      key: const Key('labels_toggle_hidden_button'),
-                      onPressed: _isMutating
-                          ? null
-                          : () {
-                              setState(() {
-                                _showHidden = !_showHidden;
-                              });
-                            },
-                      icon: Icon(
-                        _showHidden ? Icons.visibility_off : Icons.visibility,
-                      ),
-                      label: Text(
-                        _showHidden
-                            ? 'Show visible labels'
-                            : 'Show hidden labels ($hiddenCount)',
-                      ),
+                      key: const Key('labels_redo_button'),
+                      onPressed:
+                          (_redoStack.isEmpty || _isMutating) ? null : _redoLast,
+                      icon: const Icon(Icons.redo),
+                      label: const Text('Redo'),
                     ),
                   ],
                 ),
@@ -171,32 +157,30 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
   }
 
   List<LabelCatalogEntry> _filteredCatalog(List<LabelCatalogEntry> catalog) {
-    final byVisibility = catalog.where((entry) => entry.isHidden == _showHidden);
-    final byQuery = byVisibility.where(
-      (entry) => entry.name.contains(_query),
-    );
-    final output = byQuery.toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    final visible = catalog.where((entry) => !entry.isHidden);
+    final byQuery = visible.where((entry) => entry.name.contains(_query));
+    final output = byQuery.toList()..sort((a, b) => a.name.compareTo(b.name));
     return output;
   }
 
   Widget _buildLabelPill(BuildContext context, LabelCatalogEntry entry) {
-    if (_showHidden) {
-      return ActionChip(
-        key: Key('label_restore_${entry.name}'),
+    if (entry.isStandard) {
+      return InputChip(
         label: Text(entry.name),
-        avatar: const Icon(Icons.restore, size: 16),
-        onPressed: _isMutating ? null : () => _restoreHidden(entry),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        onPressed: _isMutating ? null : () {},
+        isEnabled: !_isMutating,
       );
     }
 
     return InputChip(
       label: Text(entry.name),
-      onDeleted: _isMutating ? null : () => _confirmDeleteOrHide(entry),
+      onDeleted: _isMutating ? null : () => _confirmDeleteCustom(entry),
       deleteIcon: _DeleteCircleIcon(key: Key('label_remove_${entry.name}')),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       visualDensity: VisualDensity.compact,
-      onPressed: _isMutating ? null : () => _confirmDeleteOrHide(entry),
+      onPressed: _isMutating ? null : () {},
       isEnabled: !_isMutating,
     );
   }
@@ -252,6 +236,7 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
           );
       if (wasCreated) {
         _undoStack.add(_UndoOperation.addLabel(created));
+        _redoStack.clear();
       } else {
         if (!mounted) {
           return;
@@ -267,48 +252,28 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     }
   }
 
-  Future<void> _confirmDeleteOrHide(LabelCatalogEntry entry) async {
-    if (_isMutating) {
+  Future<void> _confirmDeleteCustom(LabelCatalogEntry entry) async {
+    if (_isMutating || entry.isStandard) {
       return;
     }
 
     final shouldProceed = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        if (entry.isStandard) {
-          return AlertDialog(
-            content: const Text(
-              'This label is is a standard app label. It will not be deleted, but you can hide it. Hidden labels can always be restored',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Hide'),
-              ),
-            ],
-          );
-        }
-
-        return AlertDialog(
-          content: const Text(
-            'Are you sure to delete this label? When you exit the Labels screen, it will not be possible to restore it.',
+      builder: (context) => AlertDialog(
+        content: const Text(
+          'Are you sure to delete this label? When you exit the Labels screen, it will not be possible to restore it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
 
     if (shouldProceed != true) {
@@ -317,36 +282,12 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
 
     setState(() => _isMutating = true);
     try {
-      final repository = ref.read(exerciseRepositoryProvider);
-      if (entry.isStandard) {
-        final hidden = await repository.hideStandardLabel(entry.name);
-        if (hidden) {
-          _undoStack.add(_UndoOperation.hideStandard(entry.name));
-        }
-      } else {
-        final snapshot = await repository.deleteCustomLabel(entry.name);
-        if (snapshot != null) {
-          _undoStack.add(_UndoOperation.deleteCustom(snapshot));
-        }
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isMutating = false);
-      }
-    }
-  }
-
-  Future<void> _restoreHidden(LabelCatalogEntry entry) async {
-    if (_isMutating) {
-      return;
-    }
-    setState(() => _isMutating = true);
-    try {
-      final unhidden = await ref
+      final snapshot = await ref
           .read(exerciseRepositoryProvider)
-          .unhideStandardLabel(entry.name);
-      if (unhidden) {
-        _undoStack.add(_UndoOperation.unhideStandard(entry.name));
+          .deleteCustomLabel(entry.name);
+      if (snapshot != null) {
+        _undoStack.add(_UndoOperation.deleteCustom(snapshot));
+        _redoStack.clear();
       }
     } finally {
       if (mounted) {
@@ -366,16 +307,44 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
       final repository = ref.read(exerciseRepositoryProvider);
       switch (operation.type) {
         case _UndoType.addLabel:
-          await repository.deleteCustomLabel(operation.labelName!);
-          break;
-        case _UndoType.hideStandard:
-          await repository.unhideStandardLabel(operation.labelName!);
-          break;
-        case _UndoType.unhideStandard:
-          await repository.hideStandardLabel(operation.labelName!);
+          final deleted = await repository.deleteCustomLabel(operation.labelName);
+          if (deleted != null) {
+            _redoStack.add(operation);
+          }
           break;
         case _UndoType.deleteCustom:
           await repository.restoreDeletedCustomLabel(operation.deletedSnapshot!);
+          _redoStack.add(operation);
+          break;
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isMutating = false);
+      }
+    }
+  }
+
+  Future<void> _redoLast() async {
+    if (_redoStack.isEmpty || _isMutating) {
+      return;
+    }
+
+    final operation = _redoStack.removeLast();
+    setState(() => _isMutating = true);
+    try {
+      final repository = ref.read(exerciseRepositoryProvider);
+      switch (operation.type) {
+        case _UndoType.addLabel:
+          final recreated = await repository.createLabel(operation.labelName);
+          if (recreated) {
+            _undoStack.add(operation);
+          }
+          break;
+        case _UndoType.deleteCustom:
+          final snapshot = await repository.deleteCustomLabel(operation.labelName);
+          if (snapshot != null) {
+            _undoStack.add(_UndoOperation.deleteCustom(snapshot));
+          }
           break;
       }
     } finally {

@@ -126,4 +126,38 @@ void main() {
     expect(afterRestore, isNotNull);
     expect(afterRestore!.labels, contains('forearms'));
   });
+
+  test('standard exercise can be hidden and unhidden', () async {
+    await repository.seedIfEmpty();
+
+    final hidden = await repository.hideStandardExercise('bench_press');
+    expect(hidden, true);
+
+    final hiddenEntry = await repository.getById('bench_press');
+    expect(hiddenEntry, isNotNull);
+    expect(hiddenEntry!.isHidden, true);
+
+    final unhidden = await repository.unhideStandardExercise('bench_press');
+    expect(unhidden, true);
+
+    final visibleEntry = await repository.getById('bench_press');
+    expect(visibleEntry, isNotNull);
+    expect(visibleEntry!.isHidden, false);
+  });
+
+  test('custom exercise can be deleted from visible catalog', () async {
+    final exerciseId = await repository.createExercise(
+      name: 'Custom Pullover',
+      labels: const ['back'],
+    );
+
+    final beforeDelete = await repository.getById(exerciseId);
+    expect(beforeDelete, isNotNull);
+
+    final deleted = await repository.deleteCustomExercise(exerciseId);
+    expect(deleted, true);
+
+    final afterDelete = await repository.getById(exerciseId);
+    expect(afterDelete, isNull);
+  });
 }

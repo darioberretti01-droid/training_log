@@ -57,7 +57,12 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
         data: (_) {
           final exercisesState = ref.watch(exercisesProvider);
           return exercisesState.when(
-            data: (exercises) => _buildBody(context, exercises),
+            data: (exercises) {
+              final visibleExercises = exercises
+                  .where((exercise) => !exercise.isHidden)
+                  .toList(growable: false);
+              return _buildBody(context, visibleExercises);
+            },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => _BuilderErrorState(
               message: 'Failed to load exercises: $error',

@@ -8,19 +8,7 @@ import 'package:training_log_app/features/exercises/exercise_repository.dart';
 import 'package:training_log_app/features/exercises/labels_screen.dart';
 
 void main() {
-  testWidgets('labels description uses ADD LABEL and not +add', (tester) async {
-    await _pumpLabelsScreen(
-      tester,
-      catalog: const [
-        LabelCatalogEntry(name: 'push', isStandard: true, isHidden: false),
-      ],
-    );
-
-    expect(find.textContaining('ADD LABEL'), findsOneWidget);
-    expect(find.textContaining('+add'), findsNothing);
-  });
-
-  testWidgets('visible labels are rendered as non-selectable pill chips', (
+  testWidgets('labels description includes delete rule for added labels', (
     tester,
   ) async {
     await _pumpLabelsScreen(
@@ -30,11 +18,11 @@ void main() {
       ],
     );
 
-    expect(find.widgetWithText(InputChip, 'push'), findsOneWidget);
-    expect(find.byType(FilterChip), findsNothing);
+    expect(find.textContaining('ADD LABEL'), findsOneWidget);
+    expect(find.text('Only added labels can be deleted.'), findsOneWidget);
   });
 
-  testWidgets('standard label remove opens hide dialog copy', (tester) async {
+  testWidgets('standard labels have no remove x action', (tester) async {
     await _pumpLabelsScreen(
       tester,
       catalog: const [
@@ -42,16 +30,12 @@ void main() {
       ],
     );
 
-    await tester.tap(find.byKey(const Key('label_remove_push')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.textContaining(
-        'This label is is a standard app label. It will not be deleted, but you can hide it.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(FilledButton, 'Hide'), findsOneWidget);
+    final chipFinder = find.widgetWithText(InputChip, 'push');
+    expect(chipFinder, findsOneWidget);
+    expect(find.byKey(const Key('label_remove_push')), findsNothing);
+    final chip = tester.widget<InputChip>(chipFinder);
+    expect(chip.materialTapTargetSize, MaterialTapTargetSize.shrinkWrap);
+    expect(chip.visualDensity, VisualDensity.compact);
   });
 
   testWidgets('custom label remove opens delete dialog copy', (tester) async {
@@ -74,45 +58,48 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Delete'), findsOneWidget);
   });
 
-  testWidgets('show hidden toggle reveals hidden labels with restore action', (
+  testWidgets('show hidden labels button is removed and redo is present', (
     tester,
   ) async {
     await _pumpLabelsScreen(
       tester,
       catalog: const [
-        LabelCatalogEntry(name: 'push', isStandard: true, isHidden: true),
+        LabelCatalogEntry(name: 'push', isStandard: true, isHidden: false),
       ],
     );
 
-    expect(find.text('push'), findsNothing);
-    await tester.tap(find.byKey(const Key('labels_toggle_hidden_button')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('push'), findsOneWidget);
-    expect(find.byKey(const Key('label_restore_push')), findsOneWidget);
+    expect(find.byKey(const Key('labels_toggle_hidden_button')), findsNothing);
+    expect(find.byKey(const Key('labels_redo_button')), findsOneWidget);
   });
 
-  testWidgets('restore then undo re-hides hidden standard label', (tester) async {
+  testWidgets('undo enables redo for add-label action', (tester) async {
     final repository = _FakeExerciseRepository();
     await _pumpLabelsScreen(
       tester,
       catalog: const [
-        LabelCatalogEntry(name: 'push', isStandard: true, isHidden: true),
+        LabelCatalogEntry(name: 'push', isStandard: true, isHidden: false),
       ],
       repository: repository,
     );
 
-    await tester.tap(find.byKey(const Key('labels_toggle_hidden_button')));
+    await tester.tap(find.byKey(const Key('labels_add_button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('label_restore_push')));
+    await tester.enterText(find.byType(TextField).last, 'forearms');
+    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
     await tester.pumpAndSettle();
 
-    expect(repository.unhiddenLabels, contains('push'));
+    final redoBefore = tester.widget<OutlinedButton>(
+      find.byKey(const Key('labels_redo_button')),
+    );
+    expect(redoBefore.onPressed, isNull);
 
     await tester.tap(find.byKey(const Key('labels_undo_button')));
     await tester.pumpAndSettle();
 
-    expect(repository.hiddenLabels, contains('push'));
+    final redoAfter = tester.widget<OutlinedButton>(
+      find.byKey(const Key('labels_redo_button')),
+    );
+    expect(redoAfter.onPressed, isNotNull);
   });
 }
 
@@ -129,7 +116,9 @@ Future<void> _pumpLabelsScreen(
         labelCatalogProvider.overrideWith((ref) => Stream.value(catalog)),
         exerciseRepositoryProvider.overrideWithValue(fakeRepository),
         allLabelsProvider.overrideWith((ref) => Stream.value(const ['push'])),
-        exercisesProvider.overrideWith((ref) => Stream.value(const <ExerciseWithLabels>[])),
+        exercisesProvider.overrideWith(
+          (ref) => Stream.value(const <ExerciseWithLabels>[]),
+        ),
       ],
       child: const MaterialApp(home: LabelsScreen()),
     ),
@@ -138,8 +127,8 @@ Future<void> _pumpLabelsScreen(
 }
 
 class _FakeExerciseRepository implements ExerciseRepository {
-  final List<String> hiddenLabels = [];
-  final List<String> unhiddenLabels = [];
+  final List<String> createdLabels = [];
+  final List<String> deletedLabels = [];
 
   @override
   Future<String> createExercise({
@@ -148,11 +137,19 @@ class _FakeExerciseRepository implements ExerciseRepository {
   }) async => 'custom';
 
   @override
-  Future<bool> createLabel(String label) async => true;
+  Future<bool> createLabel(String label) async {
+    createdLabels.add(label);
+    return true;
+  }
 
   @override
-  Future<DeletedCustomLabelSnapshot?> deleteCustomLabel(String label) async =>
-      DeletedCustomLabelSnapshot(labelName: label, linkedExerciseIds: const []);
+  Future<DeletedCustomLabelSnapshot?> deleteCustomLabel(String label) async {
+    deletedLabels.add(label);
+    return DeletedCustomLabelSnapshot(labelName: label, linkedExerciseIds: const []);
+  }
+
+  @override
+  Future<bool> deleteCustomExercise(String exerciseId) async => true;
 
   @override
   Future<ExerciseWithLabels?> getById(String id) async => null;
@@ -161,10 +158,10 @@ class _FakeExerciseRepository implements ExerciseRepository {
   Future<List<String>> getAllLabels() async => const [];
 
   @override
-  Future<bool> hideStandardLabel(String label) async {
-    hiddenLabels.add(label);
-    return true;
-  }
+  Future<bool> hideStandardExercise(String standardExerciseId) async => true;
+
+  @override
+  Future<bool> hideStandardLabel(String label) async => true;
 
   @override
   Future<void> restoreDeletedCustomLabel(
@@ -184,10 +181,10 @@ class _FakeExerciseRepository implements ExerciseRepository {
   Future<void> seedIfEmpty() async {}
 
   @override
-  Future<bool> unhideStandardLabel(String label) async {
-    unhiddenLabels.add(label);
-    return true;
-  }
+  Future<bool> unhideStandardExercise(String standardExerciseId) async => true;
+
+  @override
+  Future<bool> unhideStandardLabel(String label) async => true;
 
   @override
   Stream<List<String>> watchAllLabels() => Stream.value(const []);

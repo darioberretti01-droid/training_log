@@ -65,6 +65,12 @@ abstract class ExerciseRepository {
   Future<DeletedCustomLabelSnapshot?> deleteCustomLabel(String label);
 
   Future<void> restoreDeletedCustomLabel(DeletedCustomLabelSnapshot snapshot);
+
+  Future<bool> hideStandardExercise(String standardExerciseId);
+
+  Future<bool> unhideStandardExercise(String standardExerciseId);
+
+  Future<bool> deleteCustomExercise(String exerciseId);
 }
 
 class DriftExerciseRepository implements ExerciseRepository {
@@ -86,16 +92,26 @@ class DriftExerciseRepository implements ExerciseRepository {
   Stream<List<ExerciseWithLabels>> watchExercises() {
     final standardStream = _watchStandardExercises();
     final userStream = _watchUserExercises();
+    final hiddenExerciseStream = _watchHiddenStandardExerciseIds();
 
     return Stream.multi((controller) {
       List<_StandardExercise>? standardRows;
       List<_UserExercise>? userRows;
+      List<String>? hiddenStandardExerciseIds;
 
       void emitIfReady() {
-        if (standardRows == null || userRows == null) {
+        if (standardRows == null ||
+            userRows == null ||
+            hiddenStandardExerciseIds == null) {
           return;
         }
-        controller.add(_mergeExercises(standardRows!, userRows!));
+        controller.add(
+          _mergeExercises(
+            standardRows!,
+            userRows!,
+            hiddenStandardExerciseIds!,
+          ),
+        );
       }
 
       final standardSub = standardStream.listen(
@@ -112,10 +128,18 @@ class DriftExerciseRepository implements ExerciseRepository {
         },
         onError: controller.addError,
       );
+      final hiddenExerciseSub = hiddenExerciseStream.listen(
+        (rows) {
+          hiddenStandardExerciseIds = rows;
+          emitIfReady();
+        },
+        onError: controller.addError,
+      );
 
       controller.onCancel = () async {
         await standardSub.cancel();
         await userSub.cancel();
+        await hiddenExerciseSub.cancel();
       };
     }, isBroadcast: true);
   }
@@ -538,6 +562,60 @@ class DriftExerciseRepository implements ExerciseRepository {
     }
   }
 
+  @override
+  Future<bool> hideStandardExercise(String standardExerciseId) async {
+    final standardExists = await (_db.select(_db.exercises)
+          ..where(
+            (tbl) =>
+                tbl.id.equals(standardExerciseId) & tbl.isSeeded.equals(true),
+          )
+          ..limit(1))
+        .getSingleOrNull();
+    if (standardExists == null) {
+      return false;
+    }
+
+    final existing = await (_userDb.select(_userDb.hiddenStandardExercises)
+          ..where((tbl) => tbl.standardExerciseId.equals(standardExerciseId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing != null) {
+      return false;
+    }
+
+    await _userDb.into(_userDb.hiddenStandardExercises).insert(
+      HiddenStandardExercisesCompanion.insert(
+        standardExerciseId: standardExerciseId,
+      ),
+      mode: InsertMode.insertOrIgnore,
+    );
+    return true;
+  }
+
+  @override
+  Future<bool> unhideStandardExercise(String standardExerciseId) async {
+    final deleted = await (_userDb.delete(_userDb.hiddenStandardExercises)
+          ..where((tbl) => tbl.standardExerciseId.equals(standardExerciseId)))
+        .go();
+    return deleted > 0;
+  }
+
+  @override
+  Future<bool> deleteCustomExercise(String exerciseId) async {
+    final customExercise = await (_userDb.select(_userDb.userExercises)
+          ..where((tbl) => tbl.id.equals(exerciseId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (customExercise == null || customExercise.isOverride) {
+      return false;
+    }
+
+    final deleted = await (_userDb.delete(_userDb.userExercises)
+          ..where((tbl) => tbl.id.equals(exerciseId)))
+        .go();
+    return deleted > 0;
+  }
+
   Stream<List<_StandardExercise>> _watchStandardExercises() {
     final query = _db.select(_db.exercises).join([
       leftOuterJoin(
@@ -630,10 +708,15 @@ class DriftExerciseRepository implements ExerciseRepository {
   }
 
   Future<List<ExerciseWithLabels>> _getMergedExercises() async {
-    final values = await Future.wait([_getStandardExercises(), _getUserExercises()]);
+    final values = await Future.wait([
+      _getStandardExercises(),
+      _getUserExercises(),
+      _getHiddenStandardExerciseIds(),
+    ]);
     final standardRows = values[0] as List<_StandardExercise>;
     final userRows = values[1] as List<_UserExercise>;
-    return _mergeExercises(standardRows, userRows);
+    final hiddenStandardExerciseIds = values[2] as List<String>;
+    return _mergeExercises(standardRows, userRows, hiddenStandardExerciseIds);
   }
 
   Stream<List<String>> _watchStandardLabelNames() {
@@ -660,6 +743,15 @@ class DriftExerciseRepository implements ExerciseRepository {
     );
   }
 
+  Stream<List<String>> _watchHiddenStandardExerciseIds() {
+    final query = _userDb.select(_userDb.hiddenStandardExercises)
+      ..orderBy([(tbl) => OrderingTerm(expression: tbl.standardExerciseId)]);
+    return query.watch().map(
+      (rows) =>
+          rows.map((row) => row.standardExerciseId).toList(growable: false),
+    );
+  }
+
   Future<List<String>> _getStandardLabelNames() async {
     final query = _db.select(_db.exerciseLabels)
       ..orderBy([(tbl) => OrderingTerm(expression: tbl.name)]);
@@ -681,10 +773,19 @@ class DriftExerciseRepository implements ExerciseRepository {
     return rows.map((row) => row.labelName).toList(growable: false);
   }
 
+  Future<List<String>> _getHiddenStandardExerciseIds() async {
+    final query = _userDb.select(_userDb.hiddenStandardExercises)
+      ..orderBy([(tbl) => OrderingTerm(expression: tbl.standardExerciseId)]);
+    final rows = await query.get();
+    return rows.map((row) => row.standardExerciseId).toList(growable: false);
+  }
+
   List<ExerciseWithLabels> _mergeExercises(
     List<_StandardExercise> standardRows,
     List<_UserExercise> userRows,
+    List<String> hiddenStandardExerciseIds,
   ) {
+    final hiddenSet = hiddenStandardExerciseIds.toSet();
     final overridesByStandardId = <String, _UserExercise>{};
     final customExercises = <_UserExercise>[];
     for (final user in userRows) {
@@ -705,6 +806,7 @@ class DriftExerciseRepository implements ExerciseRepository {
           id: standard.id,
           name: standard.name,
           labels: List.unmodifiable(override?.labels ?? standard.labels),
+          isHidden: hiddenSet.contains(standard.id),
           isStandard: true,
           hasCustomLabelOverride: override != null,
           overrideExerciseId: override?.id,
@@ -721,6 +823,7 @@ class DriftExerciseRepository implements ExerciseRepository {
           id: custom.id,
           name: custom.name,
           labels: List.unmodifiable(custom.labels),
+          isHidden: false,
           isStandard: false,
           hasCustomLabelOverride: false,
           historyExerciseIds: [custom.id],

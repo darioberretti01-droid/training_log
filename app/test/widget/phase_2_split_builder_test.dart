@@ -59,6 +59,43 @@ void main() {
       1,
     );
   });
+
+  testWidgets('hidden exercises are excluded from split builder selector', (
+    tester,
+  ) async {
+    final repository = _FakeSplitRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith(
+            (ref) => Stream.value(const [
+              ExerciseWithLabels(
+                id: 'bench_press',
+                name: 'Barbell Bench Press',
+                labels: ['push', 'chest'],
+              ),
+              ExerciseWithLabels(
+                id: 'pull_up',
+                name: 'Pull-Up',
+                labels: ['pull', 'back'],
+                isHidden: true,
+              ),
+            ]),
+          ),
+          splitRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: SplitBuilderScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('day_1_exercise_1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Barbell Bench Press'), findsWidgets);
+    expect(find.text('Pull-Up'), findsNothing);
+  });
 }
 
 Future<void> _pumpSplitBuilder(

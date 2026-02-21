@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -44,6 +46,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
   _ExercisePresentation _presentation = _ExercisePresentation.pills;
   _ExerciseOrdering _ordering = _ExerciseOrdering.alphabetic;
   bool _ascending = true;
+  bool _showHiddenExercises = false;
+  bool _isDeleteMode = false;
+  bool _isMutating = false;
+  String? _armedExerciseId;
   String _query = '';
 
   @override
@@ -68,7 +74,8 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
           orElse: () => const <String, int>{},
         );
         return exercisesState.when(
-          data: (exercises) => _buildLoaded(context, exercises, createdAtMap, logCountMap),
+          data: (exercises) =>
+              _buildLoaded(context, exercises, createdAtMap, logCountMap),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => _ErrorState(
             message: 'Failed to load exercises: $error',
@@ -94,46 +101,62 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     final items = _toFilteredItems(exercises, createdAtMap, logCountMap);
     final sections = _buildSections(items);
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        if (_showHiddenExercises) {
+          setState(() => _showHiddenExercises = false);
+          return;
+        }
+        context.go('/home');
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildPossiblyBlurredTopControls(context, addActionColor),
+          const SizedBox(height: 10),
+          _buildToolbarLine(context),
+          const SizedBox(height: 12),
+          if (sections.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(14),
+                child: Text('No exercises match the current filter.'),
+              ),
+            )
+          else
+            ...sections.map((section) => _buildSection(context, section)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPossiblyBlurredTopControls(BuildContext context, Color addActionColor) {
+    final controls = Column(
       children: [
         _buildSearchField(),
-        const SizedBox(height: 12),
-        _buildDivisionAndOrderingControls(context, addActionColor),
+        const SizedBox(height: 10),
+        _buildDivisionAndAddControls(context, addActionColor),
         const SizedBox(height: 8),
-        SegmentedButton<_ExercisePresentation>(
-          key: const Key('exercises_view_toggle'),
-          segments: const [
-            ButtonSegment(
-              value: _ExercisePresentation.pills,
-              icon: Icon(Icons.local_offer_outlined),
-              label: Text('Pills'),
-            ),
-            ButtonSegment(
-              value: _ExercisePresentation.list,
-              icon: Icon(Icons.view_list_outlined),
-              label: Text('List'),
-            ),
-          ],
-          selected: {_presentation},
-          onSelectionChanged: (selection) {
-            if (selection.isEmpty) {
-              return;
-            }
-            setState(() => _presentation = selection.first);
-          },
-        ),
-        const SizedBox(height: 12),
-        if (sections.isEmpty)
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(14),
-              child: Text('No exercises match the current filter.'),
-            ),
-          )
-        else
-          ...sections.map((section) => _buildSection(context, section)),
+        _buildOrderingControls(),
       ],
+    );
+
+    if (!_isDeleteMode) {
+      return controls;
+    }
+
+    return IgnorePointer(
+      child: Opacity(
+        opacity: 0.35,
+        child: ImageFiltered(
+          imageFilter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+          child: controls,
+        ),
+      ),
     );
   }
 
@@ -152,10 +175,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     );
   }
 
-  Widget _buildDivisionAndOrderingControls(
-    BuildContext context,
-    Color addActionColor,
-  ) {
+  Widget _buildDivisionAndAddControls(BuildContext context, Color addActionColor) {
     final divisionDropdown = DropdownButtonFormField<_ExerciseDivision>(
       key: const Key('exercises_grouping_dropdown'),
       initialValue: _division,
@@ -191,6 +211,22 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
       onPressed: () => context.push('/exercises/new'),
     );
 
+    return Row(
+      children: [
+        Expanded(child: divisionDropdown),
+        const SizedBox(width: 8),
+        Flexible(
+          child: FittedBox(
+            alignment: Alignment.centerRight,
+            fit: BoxFit.scaleDown,
+            child: addButton,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOrderingControls() {
     final orderingDropdown = DropdownButtonFormField<_ExerciseOrdering>(
       key: const Key('exercises_order_dropdown'),
       initialValue: _ordering,
@@ -219,62 +255,106 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
       },
     );
 
-    final invertButton = IconButton(
-      key: const Key('exercises_order_invert_button'),
-      tooltip: _ascending ? 'Ascending' : 'Descending',
-      onPressed: () => setState(() => _ascending = !_ascending),
-      icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward),
+    return Row(
+      children: [
+        Expanded(child: orderingDropdown),
+        const SizedBox(width: 4),
+        IconButton(
+          key: const Key('exercises_order_invert_button'),
+          tooltip: _ascending ? 'Ascending' : 'Descending',
+          onPressed: () => setState(() => _ascending = !_ascending),
+          icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward),
+        ),
+      ],
     );
+  }
 
-    return LayoutBuilder(
+  Widget _buildToolbarLine(BuildContext context) {
+    Widget left = LayoutBuilder(
       builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 620;
-        if (isNarrow) {
-          return Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(child: divisionDropdown),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: FittedBox(
-                      alignment: Alignment.centerRight,
-                      fit: BoxFit.scaleDown,
-                      child: addButton,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: orderingDropdown),
-                  const SizedBox(width: 4),
-                  invertButton,
-                ],
-              ),
-            ],
-          );
-        }
-
+        final isNarrow = constraints.maxWidth < 340;
         return Row(
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(child: divisionDropdown),
-                  const SizedBox(width: 8),
-                  addButton,
-                ],
-              ),
+            ToggleButtons(
+              key: const Key('exercises_view_toggle'),
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 32),
+              isSelected: [
+                _presentation == _ExercisePresentation.pills,
+                _presentation == _ExercisePresentation.list,
+              ],
+              onPressed: _isMutating
+                  ? null
+                  : (index) {
+                      setState(() {
+                        _presentation = index == 0
+                            ? _ExercisePresentation.pills
+                            : _ExercisePresentation.list;
+                      });
+                    },
+              children: const [
+                Icon(Icons.local_offer_outlined, size: 18),
+                Icon(Icons.view_list_outlined, size: 18),
+              ],
             ),
             const SizedBox(width: 8),
-            Expanded(child: orderingDropdown),
-            const SizedBox(width: 4),
-            invertButton,
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('exercises_toggle_hidden_button'),
+                onPressed: _isMutating
+                    ? null
+                    : () {
+                        setState(() => _showHiddenExercises = !_showHiddenExercises);
+                      },
+                icon: Icon(
+                  _showHiddenExercises ? Icons.visibility_off : Icons.visibility,
+                  size: 18,
+                ),
+                label: Text(
+                  _showHiddenExercises
+                      ? 'Visible'
+                      : (isNarrow ? 'Hidden' : 'Hidden exercises'),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
           ],
         );
       },
+    );
+
+    if (_isDeleteMode) {
+      left = IgnorePointer(
+        child: Opacity(
+          opacity: 0.35,
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
+            child: left,
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 8),
+        IconButton(
+          key: const Key('exercises_delete_mode_button'),
+          tooltip: _isDeleteMode ? 'Exit delete mode' : 'Delete/hide mode',
+          onPressed: _isMutating
+              ? null
+              : () {
+                  setState(() {
+                    _isDeleteMode = !_isDeleteMode;
+                    _armedExerciseId = null;
+                  });
+                },
+          icon: Icon(
+            Icons.delete_outline,
+            color: _isDeleteMode ? Theme.of(context).colorScheme.error : null,
+          ),
+        ),
+      ],
     );
   }
 
@@ -285,8 +365,13 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
   ) {
     final filtered = <_ExerciseListItem>[];
     for (final exercise in exercises) {
-      if (_query.isNotEmpty &&
-          !exercise.name.toLowerCase().contains(_query)) {
+      if (_showHiddenExercises && !exercise.isHidden) {
+        continue;
+      }
+      if (!_showHiddenExercises && exercise.isHidden) {
+        continue;
+      }
+      if (_query.isNotEmpty && !exercise.name.toLowerCase().contains(_query)) {
         continue;
       }
       final logCount = exercise.lookupExerciseIds.fold<int>(
@@ -379,7 +464,25 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
         children: [
           Text(section.title, style: titleStyle),
           const SizedBox(height: 8),
-          if (_presentation == _ExercisePresentation.pills)
+          if (_isDeleteMode)
+            Card(
+              margin: EdgeInsets.zero,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(section.items.length, (index) {
+                  final item = section.items[index];
+                  final isLast = index == section.items.length - 1;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildDeleteModeTile(context, item),
+                      if (!isLast) const Divider(height: 1),
+                    ],
+                  );
+                }),
+              ),
+            )
+          else if (_presentation == _ExercisePresentation.pills)
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -388,8 +491,9 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                     (item) => ActionChip(
                       key: Key('exercise_pill_${item.exercise.id}'),
                       label: Text(item.exercise.name),
-                      onPressed: () =>
-                          context.push('/exercises/${item.exercise.id}/history'),
+                      onPressed: _isMutating
+                          ? null
+                          : () => context.push('/exercises/${item.exercise.id}/history'),
                     ),
                   )
                   .toList(growable: false),
@@ -411,8 +515,9 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                         subtitle: item.exercise.labels.isEmpty
                             ? null
                             : Text(item.exercise.labels.join(', ')),
-                        onTap: () =>
-                            context.push('/exercises/${item.exercise.id}/history'),
+                        onTap: _isMutating
+                            ? null
+                            : () => context.push('/exercises/${item.exercise.id}/history'),
                       ),
                       if (!isLast) const Divider(height: 1),
                     ],
@@ -423,6 +528,159 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
         ],
       ),
     );
+  }
+
+  Widget _buildDeleteModeTile(BuildContext context, _ExerciseListItem item) {
+    final exercise = item.exercise;
+    final isArmed = _armedExerciseId == exercise.id;
+    final errorContainer = Theme.of(context).colorScheme.errorContainer;
+
+    return ListTile(
+      key: Key('exercise_delete_tile_${exercise.id}'),
+      tileColor: isArmed ? errorContainer.withValues(alpha: 0.65) : null,
+      title: Text(exercise.name),
+      subtitle: exercise.labels.isEmpty ? null : Text(exercise.labels.join(', ')),
+      trailing: exercise.isStandard
+          ? OutlinedButton(
+              key: Key('exercise_hide_${exercise.id}'),
+              onPressed: _isMutating
+                  ? null
+                  : () => _confirmHideOrRestoreStandardExercise(exercise),
+              child: Text(exercise.isHidden ? 'RESTORE' : 'HIDE'),
+            )
+          : IconButton(
+              key: Key('exercise_delete_${exercise.id}'),
+              onPressed:
+                  _isMutating ? null : () => _confirmDeleteCustomExercise(exercise),
+              icon: _DeleteCircleTrashIcon(
+                color: isArmed ? Theme.of(context).colorScheme.error : null,
+              ),
+            ),
+      onTap: _isMutating
+          ? null
+          : () {
+              if (exercise.isStandard) {
+                _confirmHideOrRestoreStandardExercise(exercise);
+              } else {
+                _confirmDeleteCustomExercise(exercise);
+              }
+            },
+    );
+  }
+
+  Future<void> _confirmDeleteCustomExercise(ExerciseWithLabels exercise) async {
+    if (_isMutating || exercise.isStandard) {
+      return;
+    }
+
+    setState(() => _armedExerciseId = exercise.id);
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: const Text(
+          'Are you sure to delete this exercise? When you exit the Exercises screen, it will not be possible to restore it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (shouldDelete == true) {
+      setState(() => _isMutating = true);
+      try {
+        await ref.read(exerciseRepositoryProvider).deleteCustomExercise(exercise.id);
+      } finally {
+        if (mounted) {
+          setState(() => _isMutating = false);
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() => _armedExerciseId = null);
+    }
+  }
+
+  Future<void> _confirmHideOrRestoreStandardExercise(
+    ExerciseWithLabels exercise,
+  ) async {
+    if (_isMutating || !exercise.isStandard) {
+      return;
+    }
+
+    setState(() => _armedExerciseId = exercise.id);
+    final shouldProceed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        if (exercise.isHidden) {
+          return AlertDialog(
+            content: const Text('Restore this hidden standard exercise?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Restore'),
+              ),
+            ],
+          );
+        }
+
+        return AlertDialog(
+          content: const Text(
+            'This exercise is a standard app exercise. It will not be deleted, but you can hide it. Hidden exercises can always be restored',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Hide'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (shouldProceed == true) {
+      setState(() => _isMutating = true);
+      try {
+        final repository = ref.read(exerciseRepositoryProvider);
+        if (exercise.isHidden) {
+          await repository.unhideStandardExercise(exercise.id);
+        } else {
+          await repository.hideStandardExercise(exercise.id);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isMutating = false);
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() => _armedExerciseId = null);
+    }
   }
 }
 
@@ -562,6 +820,30 @@ String _orderingLabel(_ExerciseOrdering ordering) {
       return 'Date of creation';
     case _ExerciseOrdering.mostUsed:
       return 'Most used';
+  }
+}
+
+class _DeleteCircleTrashIcon extends StatelessWidget {
+  const _DeleteCircleTrashIcon({this.color});
+
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = color ?? Theme.of(context).colorScheme.onSurfaceVariant;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: SizedBox(
+        width: 18,
+        height: 18,
+        child: Icon(Icons.delete_outline, size: 12, color: iconColor),
+      ),
+    );
   }
 }
 
