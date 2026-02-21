@@ -43,6 +43,45 @@ final exercisesProvider = StreamProvider<List<ExerciseWithLabels>>((ref) {
   return ref.watch(exerciseRepositoryProvider).watchExercises();
 });
 
+final exerciseCreatedAtMapProvider = StreamProvider<Map<String, int>>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db
+      .customSelect(
+        'SELECT id, created_at FROM exercises',
+        readsFrom: {db.exercises},
+      )
+      .watch()
+      .map((rows) {
+        final map = <String, int>{};
+        for (final row in rows) {
+          final id = row.read<String>('id');
+          final createdAt = row.read<int>('created_at');
+          map[id] = createdAt;
+        }
+        return map;
+      });
+});
+
+final exerciseLogCountMapProvider = StreamProvider<Map<String, int>>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db
+      .customSelect(
+        'SELECT exercise_id, COUNT(*) AS log_count '
+        'FROM performed_sets GROUP BY exercise_id',
+        readsFrom: {db.performedSets},
+      )
+      .watch()
+      .map((rows) {
+        final map = <String, int>{};
+        for (final row in rows) {
+          final exerciseId = row.read<String>('exercise_id');
+          final count = row.read<int>('log_count');
+          map[exerciseId] = count;
+        }
+        return map;
+      });
+});
+
 final allLabelsProvider = StreamProvider<List<String>>((ref) {
   return ref.watch(exerciseRepositoryProvider).watchAllLabels();
 });

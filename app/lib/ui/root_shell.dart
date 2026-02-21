@@ -106,17 +106,6 @@ class RootShell extends StatelessWidget {
       ];
     }
 
-    if (index == 2) {
-      return [
-        IconButton(
-          key: const Key('exercises_add_button'),
-          tooltip: 'Create exercise',
-          onPressed: () => context.push('/exercises/new'),
-          icon: const Icon(Icons.add_circle, size: 36),
-        ),
-      ];
-    }
-
     return null;
   }
 }
