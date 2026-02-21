@@ -48,17 +48,36 @@ class UserExerciseLabelLinks extends Table {
   Set<Column<Object>>? get primaryKey => {exerciseId, labelId};
 }
 
-@DriftDatabase(tables: [UserExercises, UserExerciseLabels, UserExerciseLabelLinks])
+class HiddenStandardLabels extends Table {
+  TextColumn get labelName => text().named('label_name')();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {labelName};
+}
+
+@DriftDatabase(
+  tables: [
+    UserExercises,
+    UserExerciseLabels,
+    UserExerciseLabelLinks,
+    HiddenStandardLabels,
+  ],
+)
 class UserExerciseDatabase extends _$UserExerciseDatabase {
   UserExerciseDatabase([QueryExecutor? executor])
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(hiddenStandardLabels);
+      }
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
     },

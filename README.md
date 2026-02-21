@@ -18,8 +18,10 @@ Beginner-first Flutter project for a smartphone training log.
   - root app shell updated with Home/Splits/Exercises/Other tabs
   - exercise history expanded (best set, best current-split set, last set)
   - exercise catalog personalization added (custom exercises + editable labels)
-  - searchable multi-select label picker with persistent `+add` creation action
+  - searchable multi-select label picker with persistent `ADD LABEL` creation action
   - `Other -> Labels` screen added for global label browse/create
+  - label management supports hide/restore for standard labels, delete for custom labels, and session undo
+  - bottom navigation is persistent across app routes
   - repository + migration test coverage added
 
 ## Repository Structure

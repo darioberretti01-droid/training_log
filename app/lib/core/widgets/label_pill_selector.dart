@@ -15,7 +15,7 @@ class LabelPillSelector extends StatefulWidget {
   final List<String> availableLabels;
   final List<String> selectedLabels;
   final ValueChanged<List<String>> onSelectedLabelsChanged;
-  final Future<void> Function(String label) onCreateLabel;
+  final Future<bool> Function(String label) onCreateLabel;
   final String searchHintText;
   final String emptyText;
   final bool autoSelectCreatedLabel;
@@ -150,7 +150,10 @@ class _LabelPillSelectorState extends State<LabelPillSelector> {
       return;
     }
 
-    await widget.onCreateLabel(createdLabel);
+    final created = await widget.onCreateLabel(createdLabel);
+    if (!created) {
+      return;
+    }
 
     if (!mounted || !widget.autoSelectCreatedLabel) {
       return;

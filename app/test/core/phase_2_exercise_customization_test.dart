@@ -73,9 +73,57 @@ void main() {
   test('createLabel adds label to global label catalog', () async {
     await repository.seedIfEmpty();
 
-    await repository.createLabel('forearms');
+    final created = await repository.createLabel('forearms');
 
+    expect(created, true);
     final labels = await repository.getAllLabels();
     expect(labels, contains('forearms'));
+  });
+
+  test('hide and unhide standard label updates visible and catalog states', () async {
+    await repository.seedIfEmpty();
+
+    final hidden = await repository.hideStandardLabel('push');
+    expect(hidden, true);
+
+    final visibleLabels = await repository.getAllLabels();
+    expect(visibleLabels, isNot(contains('push')));
+
+    final catalog = await repository.watchLabelCatalog().first;
+    final pushEntry = catalog.firstWhere((entry) => entry.name == 'push');
+    expect(pushEntry.isStandard, true);
+    expect(pushEntry.isHidden, true);
+
+    final unhidden = await repository.unhideStandardLabel('push');
+    expect(unhidden, true);
+
+    final visibleAfterRestore = await repository.getAllLabels();
+    expect(visibleAfterRestore, contains('push'));
+  });
+
+  test('delete custom label returns snapshot and can be restored', () async {
+    await repository.seedIfEmpty();
+
+    final exerciseId = await repository.createExercise(
+      name: 'Custom',
+      labels: const ['forearms'],
+    );
+
+    final beforeDelete = await repository.getById(exerciseId);
+    expect(beforeDelete, isNotNull);
+    expect(beforeDelete!.labels, contains('forearms'));
+
+    final snapshot = await repository.deleteCustomLabel('forearms');
+    expect(snapshot, isNotNull);
+
+    final afterDelete = await repository.getById(exerciseId);
+    expect(afterDelete, isNotNull);
+    expect(afterDelete!.labels, isNot(contains('forearms')));
+
+    await repository.restoreDeletedCustomLabel(snapshot!);
+
+    final afterRestore = await repository.getById(exerciseId);
+    expect(afterRestore, isNotNull);
+    expect(afterRestore!.labels, contains('forearms'));
   });
 }

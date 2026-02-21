@@ -872,6 +872,175 @@ class UserExerciseLabelLinksCompanion
   }
 }
 
+class $HiddenStandardLabelsTable extends HiddenStandardLabels
+    with TableInfo<$HiddenStandardLabelsTable, HiddenStandardLabel> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HiddenStandardLabelsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _labelNameMeta = const VerificationMeta(
+    'labelName',
+  );
+  @override
+  late final GeneratedColumn<String> labelName = GeneratedColumn<String>(
+    'label_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [labelName];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'hidden_standard_labels';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<HiddenStandardLabel> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('label_name')) {
+      context.handle(
+        _labelNameMeta,
+        labelName.isAcceptableOrUnknown(data['label_name']!, _labelNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelNameMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {labelName};
+  @override
+  HiddenStandardLabel map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return HiddenStandardLabel(
+      labelName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label_name'],
+      )!,
+    );
+  }
+
+  @override
+  $HiddenStandardLabelsTable createAlias(String alias) {
+    return $HiddenStandardLabelsTable(attachedDatabase, alias);
+  }
+}
+
+class HiddenStandardLabel extends DataClass
+    implements Insertable<HiddenStandardLabel> {
+  final String labelName;
+  const HiddenStandardLabel({required this.labelName});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['label_name'] = Variable<String>(labelName);
+    return map;
+  }
+
+  HiddenStandardLabelsCompanion toCompanion(bool nullToAbsent) {
+    return HiddenStandardLabelsCompanion(labelName: Value(labelName));
+  }
+
+  factory HiddenStandardLabel.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return HiddenStandardLabel(
+      labelName: serializer.fromJson<String>(json['labelName']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{'labelName': serializer.toJson<String>(labelName)};
+  }
+
+  HiddenStandardLabel copyWith({String? labelName}) =>
+      HiddenStandardLabel(labelName: labelName ?? this.labelName);
+  HiddenStandardLabel copyWithCompanion(HiddenStandardLabelsCompanion data) {
+    return HiddenStandardLabel(
+      labelName: data.labelName.present ? data.labelName.value : this.labelName,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HiddenStandardLabel(')
+          ..write('labelName: $labelName')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => labelName.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is HiddenStandardLabel && other.labelName == this.labelName);
+}
+
+class HiddenStandardLabelsCompanion
+    extends UpdateCompanion<HiddenStandardLabel> {
+  final Value<String> labelName;
+  final Value<int> rowid;
+  const HiddenStandardLabelsCompanion({
+    this.labelName = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  HiddenStandardLabelsCompanion.insert({
+    required String labelName,
+    this.rowid = const Value.absent(),
+  }) : labelName = Value(labelName);
+  static Insertable<HiddenStandardLabel> custom({
+    Expression<String>? labelName,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (labelName != null) 'label_name': labelName,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  HiddenStandardLabelsCompanion copyWith({
+    Value<String>? labelName,
+    Value<int>? rowid,
+  }) {
+    return HiddenStandardLabelsCompanion(
+      labelName: labelName ?? this.labelName,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (labelName.present) {
+      map['label_name'] = Variable<String>(labelName.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HiddenStandardLabelsCompanion(')
+          ..write('labelName: $labelName, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserExerciseDatabase extends GeneratedDatabase {
   _$UserExerciseDatabase(QueryExecutor e) : super(e);
   $UserExerciseDatabaseManager get managers =>
@@ -881,6 +1050,8 @@ abstract class _$UserExerciseDatabase extends GeneratedDatabase {
       $UserExerciseLabelsTable(this);
   late final $UserExerciseLabelLinksTable userExerciseLabelLinks =
       $UserExerciseLabelLinksTable(this);
+  late final $HiddenStandardLabelsTable hiddenStandardLabels =
+      $HiddenStandardLabelsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -889,6 +1060,7 @@ abstract class _$UserExerciseDatabase extends GeneratedDatabase {
     userExercises,
     userExerciseLabels,
     userExerciseLabelLinks,
+    hiddenStandardLabels,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -1912,6 +2084,146 @@ typedef $$UserExerciseLabelLinksTableProcessedTableManager =
       UserExerciseLabelLink,
       PrefetchHooks Function({bool exerciseId, bool labelId})
     >;
+typedef $$HiddenStandardLabelsTableCreateCompanionBuilder =
+    HiddenStandardLabelsCompanion Function({
+      required String labelName,
+      Value<int> rowid,
+    });
+typedef $$HiddenStandardLabelsTableUpdateCompanionBuilder =
+    HiddenStandardLabelsCompanion Function({
+      Value<String> labelName,
+      Value<int> rowid,
+    });
+
+class $$HiddenStandardLabelsTableFilterComposer
+    extends Composer<_$UserExerciseDatabase, $HiddenStandardLabelsTable> {
+  $$HiddenStandardLabelsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get labelName => $composableBuilder(
+    column: $table.labelName,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$HiddenStandardLabelsTableOrderingComposer
+    extends Composer<_$UserExerciseDatabase, $HiddenStandardLabelsTable> {
+  $$HiddenStandardLabelsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get labelName => $composableBuilder(
+    column: $table.labelName,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$HiddenStandardLabelsTableAnnotationComposer
+    extends Composer<_$UserExerciseDatabase, $HiddenStandardLabelsTable> {
+  $$HiddenStandardLabelsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get labelName =>
+      $composableBuilder(column: $table.labelName, builder: (column) => column);
+}
+
+class $$HiddenStandardLabelsTableTableManager
+    extends
+        RootTableManager<
+          _$UserExerciseDatabase,
+          $HiddenStandardLabelsTable,
+          HiddenStandardLabel,
+          $$HiddenStandardLabelsTableFilterComposer,
+          $$HiddenStandardLabelsTableOrderingComposer,
+          $$HiddenStandardLabelsTableAnnotationComposer,
+          $$HiddenStandardLabelsTableCreateCompanionBuilder,
+          $$HiddenStandardLabelsTableUpdateCompanionBuilder,
+          (
+            HiddenStandardLabel,
+            BaseReferences<
+              _$UserExerciseDatabase,
+              $HiddenStandardLabelsTable,
+              HiddenStandardLabel
+            >,
+          ),
+          HiddenStandardLabel,
+          PrefetchHooks Function()
+        > {
+  $$HiddenStandardLabelsTableTableManager(
+    _$UserExerciseDatabase db,
+    $HiddenStandardLabelsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HiddenStandardLabelsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$HiddenStandardLabelsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$HiddenStandardLabelsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> labelName = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => HiddenStandardLabelsCompanion(
+                labelName: labelName,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String labelName,
+                Value<int> rowid = const Value.absent(),
+              }) => HiddenStandardLabelsCompanion.insert(
+                labelName: labelName,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$HiddenStandardLabelsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$UserExerciseDatabase,
+      $HiddenStandardLabelsTable,
+      HiddenStandardLabel,
+      $$HiddenStandardLabelsTableFilterComposer,
+      $$HiddenStandardLabelsTableOrderingComposer,
+      $$HiddenStandardLabelsTableAnnotationComposer,
+      $$HiddenStandardLabelsTableCreateCompanionBuilder,
+      $$HiddenStandardLabelsTableUpdateCompanionBuilder,
+      (
+        HiddenStandardLabel,
+        BaseReferences<
+          _$UserExerciseDatabase,
+          $HiddenStandardLabelsTable,
+          HiddenStandardLabel
+        >,
+      ),
+      HiddenStandardLabel,
+      PrefetchHooks Function()
+    >;
 
 class $UserExerciseDatabaseManager {
   final _$UserExerciseDatabase _db;
@@ -1925,4 +2237,6 @@ class $UserExerciseDatabaseManager {
         _db,
         _db.userExerciseLabelLinks,
       );
+  $$HiddenStandardLabelsTableTableManager get hiddenStandardLabels =>
+      $$HiddenStandardLabelsTableTableManager(_db, _db.hiddenStandardLabels);
 }

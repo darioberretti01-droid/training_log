@@ -9,10 +9,34 @@ import '../../core/db/seed_data.dart';
 import '../../core/db/user_exercise_database.dart';
 import '../../core/models/exercise_with_labels.dart';
 
+class LabelCatalogEntry {
+  const LabelCatalogEntry({
+    required this.name,
+    required this.isStandard,
+    required this.isHidden,
+  });
+
+  final String name;
+  final bool isStandard;
+  final bool isHidden;
+}
+
+class DeletedCustomLabelSnapshot {
+  const DeletedCustomLabelSnapshot({
+    required this.labelName,
+    required this.linkedExerciseIds,
+  });
+
+  final String labelName;
+  final List<String> linkedExerciseIds;
+}
+
 abstract class ExerciseRepository {
   Stream<List<ExerciseWithLabels>> watchExercises();
 
   Stream<List<String>> watchAllLabels();
+
+  Stream<List<LabelCatalogEntry>> watchLabelCatalog();
 
   Future<ExerciseWithLabels?> getById(String id);
 
@@ -32,7 +56,15 @@ abstract class ExerciseRepository {
 
   Future<void> restoreStandardLabels(String standardExerciseId);
 
-  Future<void> createLabel(String label);
+  Future<bool> createLabel(String label);
+
+  Future<bool> hideStandardLabel(String label);
+
+  Future<bool> unhideStandardLabel(String label);
+
+  Future<DeletedCustomLabelSnapshot?> deleteCustomLabel(String label);
+
+  Future<void> restoreDeletedCustomLabel(DeletedCustomLabelSnapshot snapshot);
 }
 
 class DriftExerciseRepository implements ExerciseRepository {
@@ -48,6 +80,7 @@ class DriftExerciseRepository implements ExerciseRepository {
   final UserExerciseDatabase _userDb;
   final Uuid _uuid;
   final DateTime Function() _now;
+  static final Set<String> _standardSeedLabelSet = _buildStandardSeedLabelSet();
 
   @override
   Stream<List<ExerciseWithLabels>> watchExercises() {
@@ -91,16 +124,20 @@ class DriftExerciseRepository implements ExerciseRepository {
   Stream<List<String>> watchAllLabels() {
     final standardStream = _watchStandardLabelNames();
     final userStream = _watchUserLabelNames();
+    final hiddenStream = _watchHiddenStandardLabels();
 
     return Stream.multi((controller) {
       List<String>? standardLabels;
       List<String>? userLabels;
+      List<String>? hiddenLabels;
 
       void emitIfReady() {
-        if (standardLabels == null || userLabels == null) {
+        if (standardLabels == null || userLabels == null || hiddenLabels == null) {
           return;
         }
-        controller.add(_mergeLabelNames(standardLabels!, userLabels!));
+        controller.add(
+          _mergeVisibleLabelNames(standardLabels!, userLabels!, hiddenLabels!),
+        );
       }
 
       final standardSub = standardStream.listen(
@@ -117,10 +154,68 @@ class DriftExerciseRepository implements ExerciseRepository {
         },
         onError: controller.addError,
       );
+      final hiddenSub = hiddenStream.listen(
+        (rows) {
+          hiddenLabels = rows;
+          emitIfReady();
+        },
+        onError: controller.addError,
+      );
 
       controller.onCancel = () async {
         await standardSub.cancel();
         await userSub.cancel();
+        await hiddenSub.cancel();
+      };
+    }, isBroadcast: true);
+  }
+
+  @override
+  Stream<List<LabelCatalogEntry>> watchLabelCatalog() {
+    final standardStream = _watchStandardLabelNames();
+    final userStream = _watchUserLabelNames();
+    final hiddenStream = _watchHiddenStandardLabels();
+
+    return Stream.multi((controller) {
+      List<String>? standardLabels;
+      List<String>? userLabels;
+      List<String>? hiddenLabels;
+
+      void emitIfReady() {
+        if (standardLabels == null || userLabels == null || hiddenLabels == null) {
+          return;
+        }
+        controller.add(
+          _buildLabelCatalog(standardLabels!, userLabels!, hiddenLabels!),
+        );
+      }
+
+      final standardSub = standardStream.listen(
+        (rows) {
+          standardLabels = rows;
+          emitIfReady();
+        },
+        onError: controller.addError,
+      );
+      final userSub = userStream.listen(
+        (rows) {
+          userLabels = rows;
+          emitIfReady();
+        },
+        onError: controller.addError,
+      );
+      final hiddenSub = hiddenStream.listen(
+        (rows) {
+          hiddenLabels = rows;
+          emitIfReady();
+        },
+        onError: controller.addError,
+      );
+
+      controller.onCancel = () async {
+        await standardSub.cancel();
+        await userSub.cancel();
+        await hiddenSub.cancel();
       };
     }, isBroadcast: true);
   }
@@ -135,7 +230,8 @@ class DriftExerciseRepository implements ExerciseRepository {
   Future<List<String>> getAllLabels() async {
     final standard = await _getStandardLabelNames();
     final user = await _getUserLabelNames();
-    return _mergeLabelNames(standard, user);
+    final hidden = await _getHiddenStandardLabels();
+    return _mergeVisibleLabelNames(standard, user, hidden);
   }
 
   @override
@@ -223,7 +319,6 @@ class DriftExerciseRepository implements ExerciseRepository {
       await _replaceUserExerciseLabels(exerciseId, normalizedLabels);
     });
 
-    // Mirror custom exercises into the main DB so existing FK references still work.
     await _db.into(_db.exercises).insert(
       ExercisesCompanion.insert(
         id: exerciseId,
@@ -281,9 +376,7 @@ class DriftExerciseRepository implements ExerciseRepository {
         } else {
           await (_userDb.update(_userDb.userExercises)
                 ..where((tbl) => tbl.id.equals(existingOverride.id)))
-              .write(
-                UserExercisesCompanion(updatedAt: Value(nowMs)),
-              );
+              .write(UserExercisesCompanion(updatedAt: Value(nowMs)));
         }
 
         await _replaceUserExerciseLabels(overrideId, normalizedLabels);
@@ -302,9 +395,7 @@ class DriftExerciseRepository implements ExerciseRepository {
     await _userDb.transaction(() async {
       await (_userDb.update(_userDb.userExercises)
             ..where((tbl) => tbl.id.equals(exerciseId)))
-          .write(
-            UserExercisesCompanion(updatedAt: Value(nowMs)),
-          );
+          .write(UserExercisesCompanion(updatedAt: Value(nowMs)));
       await _replaceUserExerciseLabels(exerciseId, normalizedLabels);
     });
   }
@@ -325,10 +416,21 @@ class DriftExerciseRepository implements ExerciseRepository {
   }
 
   @override
-  Future<void> createLabel(String label) async {
-    final normalized = label.trim().toLowerCase();
+  Future<bool> createLabel(String label) async {
+    final normalized = _normalizeLabel(label);
     if (normalized.isEmpty) {
       throw ArgumentError('Label cannot be empty.');
+    }
+    if (_standardSeedLabelSet.contains(normalized)) {
+      return false;
+    }
+
+    final existing = await (_userDb.select(_userDb.userExerciseLabels)
+          ..where((tbl) => tbl.name.equals(normalized))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing != null) {
+      return false;
     }
 
     await _userDb.into(_userDb.userExerciseLabels).insert(
@@ -338,6 +440,102 @@ class DriftExerciseRepository implements ExerciseRepository {
       ),
       mode: InsertMode.insertOrIgnore,
     );
+    return true;
+  }
+
+  @override
+  Future<bool> hideStandardLabel(String label) async {
+    final normalized = _normalizeLabel(label);
+    if (!_standardSeedLabelSet.contains(normalized)) {
+      return false;
+    }
+
+    final existing = await (_userDb.select(_userDb.hiddenStandardLabels)
+          ..where((tbl) => tbl.labelName.equals(normalized))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing != null) {
+      return false;
+    }
+
+    await _userDb.into(_userDb.hiddenStandardLabels).insert(
+      HiddenStandardLabelsCompanion.insert(labelName: normalized),
+      mode: InsertMode.insertOrIgnore,
+    );
+    return true;
+  }
+
+  @override
+  Future<bool> unhideStandardLabel(String label) async {
+    final normalized = _normalizeLabel(label);
+    final deleted = await (_userDb.delete(_userDb.hiddenStandardLabels)
+          ..where((tbl) => tbl.labelName.equals(normalized)))
+        .go();
+    return deleted > 0;
+  }
+
+  @override
+  Future<DeletedCustomLabelSnapshot?> deleteCustomLabel(String label) async {
+    final normalized = _normalizeLabel(label);
+    if (normalized.isEmpty || _standardSeedLabelSet.contains(normalized)) {
+      return null;
+    }
+
+    final labelRow = await (_userDb.select(_userDb.userExerciseLabels)
+          ..where((tbl) => tbl.name.equals(normalized))
+          ..limit(1))
+        .getSingleOrNull();
+    if (labelRow == null) {
+      return null;
+    }
+
+    final linkRows = await (_userDb.select(_userDb.userExerciseLabelLinks)
+          ..where((tbl) => tbl.labelId.equals(labelRow.id)))
+        .get();
+    final linkedExerciseIds = linkRows
+        .map((link) => link.exerciseId)
+        .toSet()
+        .toList(growable: false);
+
+    await (_userDb.delete(_userDb.userExerciseLabels)
+          ..where((tbl) => tbl.id.equals(labelRow.id)))
+        .go();
+
+    return DeletedCustomLabelSnapshot(
+      labelName: normalized,
+      linkedExerciseIds: linkedExerciseIds,
+    );
+  }
+
+  @override
+  Future<void> restoreDeletedCustomLabel(DeletedCustomLabelSnapshot snapshot) async {
+    final normalized = _normalizeLabel(snapshot.labelName);
+    if (normalized.isEmpty || _standardSeedLabelSet.contains(normalized)) {
+      return;
+    }
+
+    final labelId = labelIdFromName(normalized);
+    await _userDb.into(_userDb.userExerciseLabels).insert(
+      UserExerciseLabelsCompanion.insert(id: labelId, name: normalized),
+      mode: InsertMode.insertOrIgnore,
+    );
+
+    for (final exerciseId in snapshot.linkedExerciseIds) {
+      final exists = await (_userDb.select(_userDb.userExercises)
+            ..where((tbl) => tbl.id.equals(exerciseId))
+            ..limit(1))
+          .getSingleOrNull();
+      if (exists == null) {
+        continue;
+      }
+      await _userDb.into(_userDb.userExerciseLabelLinks).insert(
+        UserExerciseLabelLinksCompanion.insert(
+          exerciseId: exerciseId,
+          labelId: labelId,
+        ),
+        mode: InsertMode.insertOrIgnore,
+      );
+    }
   }
 
   Stream<List<_StandardExercise>> _watchStandardExercises() {
@@ -431,13 +629,18 @@ class DriftExerciseRepository implements ExerciseRepository {
     return query.get().then(_mapUserRows);
   }
 
+  Future<List<ExerciseWithLabels>> _getMergedExercises() async {
+    final values = await Future.wait([_getStandardExercises(), _getUserExercises()]);
+    final standardRows = values[0] as List<_StandardExercise>;
+    final userRows = values[1] as List<_UserExercise>;
+    return _mergeExercises(standardRows, userRows);
+  }
+
   Stream<List<String>> _watchStandardLabelNames() {
     final query = _db.select(_db.exerciseLabels)
       ..orderBy([(tbl) => OrderingTerm(expression: tbl.name)]);
     return query.watch().map(
-      (rows) => rows
-          .map((row) => row.name)
-          .toList(growable: false),
+      (rows) => rows.map((row) => row.name).toList(growable: false),
     );
   }
 
@@ -445,9 +648,15 @@ class DriftExerciseRepository implements ExerciseRepository {
     final query = _userDb.select(_userDb.userExerciseLabels)
       ..orderBy([(tbl) => OrderingTerm(expression: tbl.name)]);
     return query.watch().map(
-      (rows) => rows
-          .map((row) => row.name)
-          .toList(growable: false),
+      (rows) => rows.map((row) => row.name).toList(growable: false),
+    );
+  }
+
+  Stream<List<String>> _watchHiddenStandardLabels() {
+    final query = _userDb.select(_userDb.hiddenStandardLabels)
+      ..orderBy([(tbl) => OrderingTerm(expression: tbl.labelName)]);
+    return query.watch().map(
+      (rows) => rows.map((row) => row.labelName).toList(growable: false),
     );
   }
 
@@ -465,11 +674,11 @@ class DriftExerciseRepository implements ExerciseRepository {
     return rows.map((row) => row.name).toList(growable: false);
   }
 
-  Future<List<ExerciseWithLabels>> _getMergedExercises() async {
-    final values = await Future.wait([_getStandardExercises(), _getUserExercises()]);
-    final standardRows = values[0] as List<_StandardExercise>;
-    final userRows = values[1] as List<_UserExercise>;
-    return _mergeExercises(standardRows, userRows);
+  Future<List<String>> _getHiddenStandardLabels() async {
+    final query = _userDb.select(_userDb.hiddenStandardLabels)
+      ..orderBy([(tbl) => OrderingTerm(expression: tbl.labelName)]);
+    final rows = await query.get();
+    return rows.map((row) => row.labelName).toList(growable: false);
   }
 
   List<ExerciseWithLabels> _mergeExercises(
@@ -624,7 +833,7 @@ class DriftExerciseRepository implements ExerciseRepository {
   List<String> _normalizeLabels(List<String> labels) {
     final unique = <String>{};
     for (final rawLabel in labels) {
-      final normalized = rawLabel.trim().toLowerCase();
+      final normalized = _normalizeLabel(rawLabel);
       if (normalized.isNotEmpty) {
         unique.add(normalized);
       }
@@ -633,10 +842,47 @@ class DriftExerciseRepository implements ExerciseRepository {
     return output;
   }
 
-  List<String> _mergeLabelNames(List<String> standard, List<String> user) {
+  String _normalizeLabel(String value) => value.trim().toLowerCase();
+
+  List<String> _mergeVisibleLabelNames(
+    List<String> standard,
+    List<String> user,
+    List<String> hiddenStandard,
+  ) {
+    final hidden = hiddenStandard.toSet();
     final merged = <String>{...standard, ...user};
+    merged.removeWhere((label) => hidden.contains(label));
     final output = merged.toList()..sort();
     return output;
+  }
+
+  List<LabelCatalogEntry> _buildLabelCatalog(
+    List<String> standard,
+    List<String> user,
+    List<String> hiddenStandard,
+  ) {
+    final standardSet = standard.toSet();
+    final hiddenSet = hiddenStandard.toSet();
+    final all = <String>{...standard, ...user}.toList()..sort();
+    return all
+        .map(
+          (label) => LabelCatalogEntry(
+            name: label,
+            isStandard: standardSet.contains(label),
+            isHidden: hiddenSet.contains(label) && standardSet.contains(label),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  static Set<String> _buildStandardSeedLabelSet() {
+    final labels = <String>{};
+    for (final exercise in seededExercises) {
+      for (final label in exercise.labels) {
+        labels.add(label.toLowerCase());
+      }
+    }
+    return labels;
   }
 }
 

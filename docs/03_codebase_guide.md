@@ -18,9 +18,10 @@ Current flow:
 5. User can open split builder from `Splits` via top-right `+`.
 6. User taps an exercise to open history/details.
 7. User can edit exercise labels and create custom exercises from `Exercises`.
-8. Label picking uses a searchable multi-select pill selector with persistent `+add` dialog.
+8. Label picking uses a searchable multi-select pill selector with persistent `ADD LABEL` dialog.
 9. `Other` exposes a `Labels` screen for global label browse/create.
-10. Quick logging still exists via `/quick/:exerciseId` route.
+10. Quick logging still exists via `/exercises/:exerciseId/quick` route.
+11. Bottom navigation remains visible across all routes.
 
 ## 2. Directory Map
 
@@ -59,9 +60,11 @@ App source (`app/lib`):
   - `splits_screen.dart`
   - `split_repository.dart`
 - `features/home/home_screen.dart`
-  - root tab shell and lightweight Home/Other tab content
+  - lightweight Home/Other tab content
 - `ui/app_router.dart`
   - app routes
+- `ui/root_shell.dart`
+  - persistent bottom navigation shell
 
 Tests:
 - `app/test/core/phase_1a_repositories_test.dart`
@@ -101,6 +104,8 @@ User exercise DB (`training_log_user_exercises.sqlite`):
   - id, name
 - `user_exercise_label_links`
   - exercise_id, label_id (composite PK)
+- `hidden_standard_labels`
+  - label_name
 
 Current conventions:
 - Phase 1A uses `session_type = "quick"` only.
@@ -119,9 +124,13 @@ Current conventions:
 Repositories:
 - `ExerciseRepository`
   - watch merged list of standard + custom exercises
+  - watch visible labels and full label catalog
   - get exercise by id
   - seed DB if empty
   - create custom exercise
+  - create custom labels
+  - hide/unhide standard labels
+  - delete/restore custom labels
   - edit labels
   - restore standard labels for overridden standard exercises
 - `QuickWorkoutRepository`
@@ -143,6 +152,7 @@ Provider layer (`providers.dart`):
 - `userExerciseDatabaseProvider`
 - `exerciseRepositoryProvider`
 - `allLabelsProvider`
+- `labelCatalogProvider`
 - `quickWorkoutRepositoryProvider`
 - `seedDataProvider`
 - query providers for list/exercise/best/recent
@@ -157,12 +167,17 @@ Provider layer (`providers.dart`):
 ## 5. UI and Routes
 
 Routes:
-- `/` -> root tab shell
-- `/quick/:exerciseId` -> quick workout entry
-- `/history/:exerciseId` -> history for one exercise
-- `/exercises/new` -> create custom exercise
-- `/exercises/:exerciseId/labels` -> edit labels for exercise
+- `/` -> redirects to `/home`
+- `/home` -> home tab
+- `/splits` -> splits tab
 - `/splits/builder` -> split builder
+- `/exercises` -> exercises tab
+- `/exercises/new` -> create custom exercise
+- `/exercises/:exerciseId/history` -> history for one exercise
+- `/exercises/:exerciseId/labels` -> edit labels for exercise
+- `/exercises/:exerciseId/quick` -> quick workout entry
+- `/other` -> other tab
+- `/other/labels` -> labels management
 
 Screen behavior:
 - Root shell:
@@ -185,12 +200,15 @@ Screen behavior:
 - Exercise labels editor:
   - add/remove labels
   - label selection supports search + multi-select chips
-  - chip list always ends with a persistent `+add` chip (opens centered create-label dialog)
+  - chip list always ends with a persistent `ADD LABEL` chip (opens centered create-label dialog)
   - when editing a standard exercise, save creates/updates a temporary override entry
   - overridden standard exercises can restore original labels via `Back to standard labels`
 - Labels screen:
-  - shows all known labels via searchable multi-select chips
-  - supports creating new labels through the same persistent `+add` dialog flow
+  - shows labels as a searchable list (no selection mode)
+  - supports creating new labels through `ADD LABEL`
+  - allows delete for custom labels
+  - allows hide/restore for standard labels
+  - supports in-session undo for add/hide/delete actions
 - Splits:
   - highlighted `Current split` section showing active split (if any)
   - `All splits` section with all saved splits ordered by latest update
@@ -237,7 +255,6 @@ Widget test covers:
 - Summary screen and launch-from-day-plan flow are not implemented yet.
 - Home tab action buttons are UI placeholders (logging behavior not wired yet).
 - No progression/suggestion rules yet.
-- No delete flow yet for custom exercises.
 
 ## 8. How to Extend Safely
 

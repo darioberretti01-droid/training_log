@@ -4,111 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/state/providers.dart';
-import '../exercises/exercise_list_screen.dart';
-import '../splits/splits_screen.dart';
 import '../workouts/quick_workout_repository.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final title = _titleForIndex(_selectedIndex);
-    final body = _bodyForIndex(_selectedIndex);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        actions: _actionsForIndex(_selectedIndex, context),
-      ),
-      body: body,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(
-            icon: Icon(Icons.view_week_outlined),
-            label: 'Splits',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.fitness_center_outlined),
-            label: 'Exercises',
-          ),
-          NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Other'),
-        ],
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-        },
-      ),
-    );
-  }
-
-  String _titleForIndex(int index) {
-    switch (index) {
-      case 0:
-        return 'Home';
-      case 1:
-        return 'Splits';
-      case 2:
-        return 'Exercises';
-      case 3:
-        return 'Other';
-      default:
-        return 'Home';
-    }
-  }
-
-  Widget _bodyForIndex(int index) {
-    switch (index) {
-      case 0:
-        return const _HomeTabContent();
-      case 1:
-        return const SplitsScreen();
-      case 2:
-        return const ExerciseListContent();
-      case 3:
-        return const _OtherTabContent();
-      default:
-        return const _HomeTabContent();
-    }
-  }
-
-  List<Widget>? _actionsForIndex(int index, BuildContext context) {
-    if (index == 1) {
-      return [
-        IconButton(
-          key: const Key('splits_add_button'),
-          tooltip: 'Create split',
-          onPressed: () => context.push('/splits/builder'),
-          icon: const Icon(Icons.add_circle, size: 36),
-        ),
-      ];
-    }
-
-    if (index == 2) {
-      return [
-        IconButton(
-          key: const Key('exercises_add_button'),
-          tooltip: 'Create exercise',
-          onPressed: () => context.push('/exercises/new'),
-          icon: const Icon(Icons.add_circle, size: 36),
-        ),
-      ];
-    }
-
-    return null;
-  }
-}
-
-class _HomeTabContent extends ConsumerWidget {
-  const _HomeTabContent();
+class HomeTabContent extends ConsumerWidget {
+  const HomeTabContent({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -239,9 +138,7 @@ class _HomeSessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final startedAt = DateTime.fromMillisecondsSinceEpoch(
-      entry.session.startedAt,
-    );
+    final startedAt = DateTime.fromMillisecondsSinceEpoch(entry.session.startedAt);
     final endedAt = DateTime.fromMillisecondsSinceEpoch(entry.session.endedAt);
     final durationMinutes = endedAt.difference(startedAt).inMinutes;
 
@@ -259,7 +156,7 @@ class _HomeSessionCard extends StatelessWidget {
         enabled: primaryExerciseId != null,
         onTap: primaryExerciseId == null
             ? null
-            : () => context.push('/history/$primaryExerciseId'),
+            : () => context.push('/exercises/$primaryExerciseId/history'),
         title: Text(
           'Session ${DateFormat('yyyy-MM-dd HH:mm').format(startedAt)}',
         ),
@@ -285,8 +182,8 @@ String _exerciseSummary(List<HomeSessionExerciseSummary> exercises) {
   return firstTwo;
 }
 
-class _OtherTabContent extends StatelessWidget {
-  const _OtherTabContent();
+class OtherTabContent extends StatelessWidget {
+  const OtherTabContent({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +196,7 @@ class _OtherTabContent extends StatelessWidget {
             title: const Text('Labels'),
             subtitle: const Text('Browse and create labels'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/labels'),
+            onTap: () => context.push('/other/labels'),
           ),
         ),
       ],

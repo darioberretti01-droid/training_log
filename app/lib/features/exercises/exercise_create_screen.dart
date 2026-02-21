@@ -74,7 +74,7 @@ class _ExerciseCreateScreenState extends ConsumerState<ExerciseCreateScreen> {
                 });
               },
               onCreateLabel: (label) async {
-                await ref.read(exerciseRepositoryProvider).createLabel(label);
+                return ref.read(exerciseRepositoryProvider).createLabel(label);
               },
             ),
             loading: () => const Center(child: CircularProgressIndicator()),

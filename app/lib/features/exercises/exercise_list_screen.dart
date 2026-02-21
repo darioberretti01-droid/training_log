@@ -93,10 +93,10 @@ class _ExerciseTile extends StatelessWidget {
       ),
       trailing: IconButton(
         tooltip: 'History',
-        onPressed: () => context.push('/history/${exercise.id}'),
+        onPressed: () => context.push('/exercises/${exercise.id}/history'),
         icon: const Icon(Icons.history),
       ),
-      onTap: () => context.push('/history/${exercise.id}'),
+      onTap: () => context.push('/exercises/${exercise.id}/history'),
     );
   }
 }

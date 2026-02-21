@@ -47,6 +47,10 @@ final allLabelsProvider = StreamProvider<List<String>>((ref) {
   return ref.watch(exerciseRepositoryProvider).watchAllLabels();
 });
 
+final labelCatalogProvider = StreamProvider<List<LabelCatalogEntry>>((ref) {
+  return ref.watch(exerciseRepositoryProvider).watchLabelCatalog();
+});
+
 final exerciseByIdProvider = FutureProvider.family<ExerciseWithLabels?, String>(
   (ref, exerciseId) {
     return ref.watch(exerciseRepositoryProvider).getById(exerciseId);

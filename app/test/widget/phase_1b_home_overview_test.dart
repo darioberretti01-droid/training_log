@@ -91,9 +91,10 @@ void main() {
   ) async {
     final router = GoRouter(
       routes: [
-        GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+        GoRoute(path: '/', redirect: (context, state) => '/home'),
+        GoRoute(path: '/home', builder: (context, state) => const HomeTabContent()),
         GoRoute(
-          path: '/history/:exerciseId',
+          path: '/exercises/:exerciseId/history',
           builder: (context, state) {
             final exerciseId = state.pathParameters['exerciseId']!;
             return Scaffold(body: Text('History target: $exerciseId'));
@@ -151,9 +152,10 @@ Future<void> _pumpHome(
 }) async {
   final router = GoRouter(
     routes: [
-      GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+      GoRoute(path: '/', redirect: (context, state) => '/home'),
+      GoRoute(path: '/home', builder: (context, state) => const HomeTabContent()),
       GoRoute(
-        path: '/history/:exerciseId',
+        path: '/exercises/:exerciseId/history',
         builder: (context, state) => const SizedBox.shrink(),
       ),
     ],

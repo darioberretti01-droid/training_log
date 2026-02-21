@@ -31,8 +31,13 @@ This document tracks the product roadmap and current status.
     - best current-split set
     - last set
     - editable label section
-  - label selection upgraded to searchable multi-select pill picker with persistent `+add` action
+  - label selection upgraded to searchable multi-select pill picker with persistent `ADD LABEL` action
   - `Other` tab now includes a dedicated `Labels` screen for browsing/creating labels
+  - labels management behavior expanded:
+    - custom labels can be deleted
+    - standard labels can be hidden/restored
+    - labels screen supports per-session undo for add/hide/delete actions
+  - navigation shell updated so bottom tab selector remains visible across screens
   - exercises tab behavior updated:
     - tap exercise opens history (not quick log)
     - top-right `+` opens new exercise creation

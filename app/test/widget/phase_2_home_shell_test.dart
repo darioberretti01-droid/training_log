@@ -22,7 +22,7 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Splits'));
+    await tester.tap(find.byIcon(Icons.view_week_outlined));
     await tester.pumpAndSettle();
 
     expect(find.text('Current split'), findsOneWidget);
@@ -54,7 +54,7 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Splits'));
+    await tester.tap(find.byIcon(Icons.view_week_outlined));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('splits_add_button')));
     await tester.pumpAndSettle();

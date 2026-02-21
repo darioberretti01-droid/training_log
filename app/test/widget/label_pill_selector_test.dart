@@ -66,6 +66,7 @@ void main() {
             initialSelected: const [],
             onCreateLabel: (_) async {
               createCalls += 1;
+              return true;
             },
           ),
         ),
@@ -97,6 +98,7 @@ void main() {
             initialSelected: const [],
             onCreateLabel: (label) async {
               createdLabels.add(label);
+              return true;
             },
             onSelectedChanged: (value) {
               selected = value;
@@ -128,7 +130,7 @@ class _SelectorHost extends StatefulWidget {
 
   final List<String> availableLabels;
   final List<String> initialSelected;
-  final Future<void> Function(String label)? onCreateLabel;
+  final Future<bool> Function(String label)? onCreateLabel;
   final ValueChanged<List<String>>? onSelectedChanged;
 
   @override
@@ -155,7 +157,7 @@ class _SelectorHostState extends State<_SelectorHost> {
         });
         widget.onSelectedChanged?.call(labels);
       },
-      onCreateLabel: widget.onCreateLabel ?? (_) async {},
+      onCreateLabel: widget.onCreateLabel ?? (_) async => true,
     );
   }
 }
