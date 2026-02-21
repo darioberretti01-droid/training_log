@@ -2,22 +2,26 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:training_log_app/core/db/app_database.dart';
+import 'package:training_log_app/core/db/user_exercise_database.dart';
 import 'package:training_log_app/core/models/exercise_with_labels.dart';
 import 'package:training_log_app/features/exercises/exercise_repository.dart';
 import 'package:training_log_app/features/workouts/quick_workout_repository.dart';
 
 void main() {
   late AppDatabase database;
+  late UserExerciseDatabase userExerciseDatabase;
   late DriftExerciseRepository exerciseRepository;
   late DriftQuickWorkoutRepository quickWorkoutRepository;
 
   setUp(() {
     database = AppDatabase(NativeDatabase.memory());
-    exerciseRepository = DriftExerciseRepository(database);
+    userExerciseDatabase = UserExerciseDatabase(NativeDatabase.memory());
+    exerciseRepository = DriftExerciseRepository(database, userExerciseDatabase);
     quickWorkoutRepository = DriftQuickWorkoutRepository(database);
   });
 
   tearDown(() async {
+    await userExerciseDatabase.close();
     await database.close();
   });
 

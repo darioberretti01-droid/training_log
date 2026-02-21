@@ -2,7 +2,7 @@
 
 This document tracks the product roadmap and current status.
 
-## Current Status (as of 2026-02-20)
+## Current Status (as of 2026-02-21)
 - Environment setup complete (Flutter + Android toolchain verified).
 - Phase 1A implemented:
   - local DB schema (exercises, labels, sessions, performed sets)
@@ -26,6 +26,20 @@ This document tracks the product roadmap and current status.
   - split builder create flow added (day/exercise planning + save)
   - split browsing page added (active split highlight + all splits list)
   - root app shell updated to 4 tabs (`Home`, `Splits`, `Exercises`, `Other`)
+  - exercise history updated to show:
+    - best set
+    - best current-split set
+    - last set
+    - editable label section
+  - label selection upgraded to searchable multi-select pill picker with persistent `+add` action
+  - `Other` tab now includes a dedicated `Labels` screen for browsing/creating labels
+  - exercises tab behavior updated:
+    - tap exercise opens history (not quick log)
+    - top-right `+` opens new exercise creation
+  - separate user exercise DB added for:
+    - custom exercises
+    - temporary label overrides for standard exercises
+    - restore-standard-labels flow for overridden standard exercises
 
 ## Roadmap
 
@@ -67,6 +81,7 @@ Phase 1B (in progress):
   - summary screen: set volume by label/muscle group
   - launch workout from day plan
   - workout screen references: last / best-in-split / best all-time
+  - connect home quick actions to actual workout flows (currently placeholders)
 
 ### Phase 3 - Progression and Warnings (v1.1)
 - increase-load suggestion when prior range was saturated

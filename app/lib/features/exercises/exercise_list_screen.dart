@@ -96,7 +96,7 @@ class _ExerciseTile extends StatelessWidget {
         onPressed: () => context.push('/history/${exercise.id}'),
         icon: const Icon(Icons.history),
       ),
-      onTap: () => context.push('/quick/${exercise.id}'),
+      onTap: () => context.push('/history/${exercise.id}'),
     );
   }
 }

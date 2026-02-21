@@ -2,19 +2,22 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:training_log_app/core/db/app_database.dart';
+import 'package:training_log_app/core/db/user_exercise_database.dart';
 import 'package:training_log_app/core/models/exercise_with_labels.dart';
 import 'package:training_log_app/features/exercises/exercise_repository.dart';
 import 'package:training_log_app/features/splits/split_repository.dart';
 
 void main() {
   late AppDatabase database;
+  late UserExerciseDatabase userExerciseDatabase;
   late DriftExerciseRepository exerciseRepository;
   late DriftSplitRepository splitRepository;
   late int nowMs;
 
   setUp(() {
     database = AppDatabase(NativeDatabase.memory());
-    exerciseRepository = DriftExerciseRepository(database);
+    userExerciseDatabase = UserExerciseDatabase(NativeDatabase.memory());
+    exerciseRepository = DriftExerciseRepository(database, userExerciseDatabase);
     nowMs = DateTime(2026, 2, 20, 9, 0).millisecondsSinceEpoch;
     splitRepository = DriftSplitRepository(
       database,
@@ -23,6 +26,7 @@ void main() {
   });
 
   tearDown(() async {
+    await userExerciseDatabase.close();
     await database.close();
   });
 

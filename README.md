@@ -16,6 +16,10 @@ Beginner-first Flutter project for a smartphone training log.
   - split builder create flow added
   - split browsing UI added (active split + all splits)
   - root app shell updated with Home/Splits/Exercises/Other tabs
+  - exercise history expanded (best set, best current-split set, last set)
+  - exercise catalog personalization added (custom exercises + editable labels)
+  - searchable multi-select label picker with persistent `+add` creation action
+  - `Other -> Labels` screen added for global label browse/create
   - repository + migration test coverage added
 
 ## Repository Structure

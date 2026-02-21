@@ -26,16 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        actions: _selectedIndex == 1
-            ? [
-                IconButton(
-                  key: const Key('splits_add_button'),
-                  tooltip: 'Create split',
-                  onPressed: () => context.push('/splits/builder'),
-                  icon: const Icon(Icons.add_circle, size: 36),
-                ),
-              ]
-            : null,
+        actions: _actionsForIndex(_selectedIndex, context),
       ),
       body: body,
       bottomNavigationBar: NavigationBar(
@@ -87,6 +78,32 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return const _HomeTabContent();
     }
+  }
+
+  List<Widget>? _actionsForIndex(int index, BuildContext context) {
+    if (index == 1) {
+      return [
+        IconButton(
+          key: const Key('splits_add_button'),
+          tooltip: 'Create split',
+          onPressed: () => context.push('/splits/builder'),
+          icon: const Icon(Icons.add_circle, size: 36),
+        ),
+      ];
+    }
+
+    if (index == 2) {
+      return [
+        IconButton(
+          key: const Key('exercises_add_button'),
+          tooltip: 'Create exercise',
+          onPressed: () => context.push('/exercises/new'),
+          icon: const Icon(Icons.add_circle, size: 36),
+        ),
+      ];
+    }
+
+    return null;
   }
 }
 
@@ -273,6 +290,19 @@ class _OtherTabContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('Other'));
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          child: ListTile(
+            key: const Key('other_labels_item'),
+            title: const Text('Labels'),
+            subtitle: const Text('Browse and create labels'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/labels'),
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -50,3 +50,16 @@ When code and docs diverge, update docs in the same branch before commit.
 - Relevant tests exist and pass.
 - Documentation is updated.
 - No analyzer errors.
+
+## 8. Emulator Deploy Verification (Required for UI Changes)
+When a user asks to "open/start the app" after code changes, use a fresh deploy path so they see the latest build:
+1. Ensure emulator is running and online (`flutter emulators`, `adb devices`).
+2. Stop old app instance and uninstall package:
+   - `adb shell am force-stop com.dario.training.training_log_app`
+   - `adb uninstall com.dario.training.training_log_app`
+3. From `app/`, rebuild/install with:
+   - `flutter clean`
+   - `flutter pub get`
+   - `flutter run -d emulator-5554`
+4. Confirm app process exists after install (`adb shell pidof com.dario.training.training_log_app`).
+5. If a detached/background launch is required, still ensure one confirmed successful install happened first.

@@ -16,8 +16,11 @@ Current flow:
 3. `Home` shows quick logging actions and recent session overview.
 4. `Exercises` triggers seeding if DB is empty and shows exercise list.
 5. User can open split builder from `Splits` via top-right `+`.
-6. User opens quick log for an exercise and saves sets.
-7. User opens history to review best and recent sets.
+6. User taps an exercise to open history/details.
+7. User can edit exercise labels and create custom exercises from `Exercises`.
+8. Label picking uses a searchable multi-select pill selector with persistent `+add` dialog.
+9. `Other` exposes a `Labels` screen for global label browse/create.
+10. Quick logging still exists via `/quick/:exerciseId` route.
 
 ## 2. Directory Map
 
@@ -32,6 +35,8 @@ App source (`app/lib`):
 - `core/db/`
   - `app_database.dart` - Drift tables + DB connection
   - `app_database.g.dart` - generated Drift code
+  - `user_exercise_database.dart` - separate Drift DB for custom exercises + standard-label overrides
+  - `user_exercise_database.g.dart` - generated Drift code
   - `seed_data.dart` - seeded exercise catalog and labels
 - `core/models/`
   - `exercise_with_labels.dart`
@@ -41,6 +46,9 @@ App source (`app/lib`):
   - app-level query providers
 - `features/exercises/`
   - `exercise_repository.dart`
+  - `exercise_create_screen.dart`
+  - `exercise_labels_screen.dart`
+  - `labels_screen.dart`
   - `exercise_list_screen.dart`
   - `exercise_history_screen.dart`
 - `features/workouts/`
@@ -68,7 +76,7 @@ Tests:
 
 ## 3. Data Model (Drift)
 
-Tables:
+Main DB (`training_log.sqlite`):
 - `exercises`
   - id, name, is_seeded, created_at, updated_at
 - `exercise_labels`
@@ -86,6 +94,14 @@ Tables:
 - `planned_exercises`
   - id, day_plan_id, exercise_id, order_index, target_sets, rep_min, rep_max, rest_seconds, target_rpe, created_at, updated_at
 
+User exercise DB (`training_log_user_exercises.sqlite`):
+- `user_exercises`
+  - id, name, is_override, standard_exercise_id, created_at, updated_at
+- `user_exercise_labels`
+  - id, name
+- `user_exercise_label_links`
+  - exercise_id, label_id (composite PK)
+
 Current conventions:
 - Phase 1A uses `session_type = "quick"` only.
 - Unit is kilograms only.
@@ -102,14 +118,18 @@ Current conventions:
 
 Repositories:
 - `ExerciseRepository`
-  - watch list of exercises with labels
+  - watch merged list of standard + custom exercises
   - get exercise by id
   - seed DB if empty
+  - create custom exercise
+  - edit labels
+  - restore standard labels for overridden standard exercises
 - `QuickWorkoutRepository`
   - save quick workout transactionally
-  - get best set for exercise
+  - get best set for exercise or exercise-id group
+  - get last set for exercise-id group
   - get recent sets for exercise
-  - get recent session-grouped history for exercise
+  - get recent session-grouped history for exercise or exercise-id group
   - get recent session overview for home (cross-exercise summary)
 - `SplitRepository`
   - create split with day plans + planned exercises transactionally
@@ -120,11 +140,14 @@ Repositories:
 
 Provider layer (`providers.dart`):
 - `appDatabaseProvider`
+- `userExerciseDatabaseProvider`
 - `exerciseRepositoryProvider`
+- `allLabelsProvider`
 - `quickWorkoutRepositoryProvider`
 - `seedDataProvider`
 - query providers for list/exercise/best/recent
 - session-grouped history provider: `recentSessionsByExerciseProvider`
+- lookup-based history providers: `bestSetByLookupProvider`, `lastSetByLookupProvider`, `recentSessionsByLookupProvider`
 - home recent sessions provider: `recentHomeSessionsProvider`
 - split repository provider: `splitRepositoryProvider`
 - split list provider: `splitsProvider`
@@ -137,6 +160,8 @@ Routes:
 - `/` -> root tab shell
 - `/quick/:exerciseId` -> quick workout entry
 - `/history/:exerciseId` -> history for one exercise
+- `/exercises/new` -> create custom exercise
+- `/exercises/:exerciseId/labels` -> edit labels for exercise
 - `/splits/builder` -> split builder
 
 Screen behavior:
@@ -144,15 +169,28 @@ Screen behavior:
   - app bar title reflects selected tab (`Home`, `Splits`, `Exercises`, `Other`)
   - bottom navigation exposes 4 sections
   - top-right prominent `+` appears on `Splits` tab and opens split builder
+  - top-right prominent `+` appears on `Exercises` tab and opens custom exercise creation
+  - `Other` tab includes navigation to global label management
 - Home tab:
   - large `Log current split` action
   - two secondary actions: `Log from other split`, `Log single exercises`
   - `Recent sessions` section with session cards (timestamp, duration, total sets, exercise summary)
   - each recent session card navigates to history for its primary exercise
 - Exercise list:
-  - shows seeded exercises + label chips
-  - tap row opens quick log
-  - history icon opens history
+  - shows merged exercise catalog (standard + custom + overridden labels)
+  - tap row opens exercise history/details
+  - history icon also opens history
+- Exercise create:
+  - create custom exercise with name + labels
+- Exercise labels editor:
+  - add/remove labels
+  - label selection supports search + multi-select chips
+  - chip list always ends with a persistent `+add` chip (opens centered create-label dialog)
+  - when editing a standard exercise, save creates/updates a temporary override entry
+  - overridden standard exercises can restore original labels via `Back to standard labels`
+- Labels screen:
+  - shows all known labels via searchable multi-select chips
+  - supports creating new labels through the same persistent `+add` dialog flow
 - Splits:
   - highlighted `Current split` section showing active split (if any)
   - `All splits` section with all saved splits ordered by latest update
@@ -168,7 +206,8 @@ Screen behavior:
   - optional: rest and RPE
   - save writes one session + N sets
 - History:
-  - top best-set card
+  - labels section with edit action
+  - top performance cards: best set, best current split set, last set
   - recent sessions grouped by workout session
   - each session shows timestamp, duration, and its set list
 
@@ -198,7 +237,7 @@ Widget test covers:
 - Summary screen and launch-from-day-plan flow are not implemented yet.
 - Home tab action buttons are UI placeholders (logging behavior not wired yet).
 - No progression/suggestion rules yet.
-- No custom exercise create/edit/delete yet.
+- No delete flow yet for custom exercises.
 
 ## 8. How to Extend Safely
 

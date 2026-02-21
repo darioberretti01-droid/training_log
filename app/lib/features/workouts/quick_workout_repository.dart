@@ -14,6 +14,10 @@ abstract class QuickWorkoutRepository {
 
   Future<PerformedSet?> getBestSetForExercise(String exerciseId);
 
+  Future<PerformedSet?> getBestSetForExercises(List<String> exerciseIds);
+
+  Future<PerformedSet?> getLastSetForExercises(List<String> exerciseIds);
+
   Future<List<PerformedSet>> getRecentSetsForExercise(
     String exerciseId, {
     int limit = 30,
@@ -21,6 +25,11 @@ abstract class QuickWorkoutRepository {
 
   Future<List<ExerciseSessionHistoryEntry>> getRecentSessionsForExercise(
     String exerciseId, {
+    int sessionLimit = 12,
+  });
+
+  Future<List<ExerciseSessionHistoryEntry>> getRecentSessionsForExercises(
+    List<String> exerciseIds, {
     int sessionLimit = 12,
   });
 
@@ -137,12 +146,41 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
 
   @override
   Future<PerformedSet?> getBestSetForExercise(String exerciseId) {
+    return getBestSetForExercises([exerciseId]);
+  }
+
+  @override
+  Future<PerformedSet?> getBestSetForExercises(List<String> exerciseIds) {
+    final normalizedIds = _normalizeExerciseIds(exerciseIds);
+    if (normalizedIds.isEmpty) {
+      return Future.value(null);
+    }
+
     final query = _db.select(_db.performedSets)
-      ..where((tbl) => tbl.exerciseId.equals(exerciseId))
+      ..where((tbl) => _exerciseIdFilter(tbl, normalizedIds))
       ..orderBy([
         (tbl) => OrderingTerm.desc(tbl.weightKg),
         (tbl) => OrderingTerm.desc(tbl.reps),
         (tbl) => OrderingTerm.desc(tbl.performedAt),
+      ])
+      ..limit(1);
+
+    return query.getSingleOrNull();
+  }
+
+  @override
+  Future<PerformedSet?> getLastSetForExercises(List<String> exerciseIds) {
+    final normalizedIds = _normalizeExerciseIds(exerciseIds);
+    if (normalizedIds.isEmpty) {
+      return Future.value(null);
+    }
+
+    final query = _db.select(_db.performedSets)
+      ..where((tbl) => _exerciseIdFilter(tbl, normalizedIds))
+      ..orderBy([
+        (tbl) => OrderingTerm.desc(tbl.performedAt),
+        (tbl) => OrderingTerm.desc(tbl.setIndex),
+        (tbl) => OrderingTerm.desc(tbl.id),
       ])
       ..limit(1);
 
@@ -169,7 +207,20 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
   Future<List<ExerciseSessionHistoryEntry>> getRecentSessionsForExercise(
     String exerciseId, {
     int sessionLimit = 12,
+  }) {
+    return getRecentSessionsForExercises([exerciseId], sessionLimit: sessionLimit);
+  }
+
+  @override
+  Future<List<ExerciseSessionHistoryEntry>> getRecentSessionsForExercises(
+    List<String> exerciseIds, {
+    int sessionLimit = 12,
   }) async {
+    final normalizedIds = _normalizeExerciseIds(exerciseIds);
+    if (normalizedIds.isEmpty) {
+      return const [];
+    }
+
     final query =
         _db.select(_db.performedSets).join([
             innerJoin(
@@ -177,7 +228,7 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
               _db.workoutSessions.id.equalsExp(_db.performedSets.sessionId),
             ),
           ])
-          ..where(_db.performedSets.exerciseId.equals(exerciseId))
+          ..where(_db.performedSets.exerciseId.isIn(normalizedIds))
           ..orderBy([
             OrderingTerm.desc(_db.workoutSessions.startedAt),
             OrderingTerm.asc(_db.performedSets.setIndex),
@@ -293,6 +344,27 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
           );
         })
         .toList(growable: false);
+  }
+
+  Expression<bool> _exerciseIdFilter(
+    $PerformedSetsTable tbl,
+    List<String> exerciseIds,
+  ) {
+    if (exerciseIds.length == 1) {
+      return tbl.exerciseId.equals(exerciseIds.first);
+    }
+    return tbl.exerciseId.isIn(exerciseIds);
+  }
+
+  List<String> _normalizeExerciseIds(List<String> exerciseIds) {
+    final unique = <String>{};
+    for (final id in exerciseIds) {
+      final trimmed = id.trim();
+      if (trimmed.isNotEmpty) {
+        unique.add(trimmed);
+      }
+    }
+    return unique.toList(growable: false);
   }
 }
 
