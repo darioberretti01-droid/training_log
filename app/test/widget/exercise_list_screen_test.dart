@@ -57,17 +57,46 @@ void main() {
     expect(find.text('Other'), findsNothing);
   });
 
-  testWidgets('most-used ordering can be inverted in list mode', (tester) async {
+  testWidgets('muscles division shows exercise in every matching category', (
+    tester,
+  ) async {
+    await _pumpExerciseList(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(
+          id: 'bench_press',
+          name: 'Barbell Bench Press',
+          labels: ['chest', 'triceps', 'push'],
+        ),
+      ],
+    );
+
+    expect(find.text('Chest'), findsOneWidget);
+    expect(find.text('Triceps'), findsOneWidget);
+    expect(
+      find.widgetWithText(ActionChip, 'Barbell Bench Press'),
+      findsNWidgets(2),
+    );
+    expect(
+      find.byKey(const Key('exercise_pill_bench_press_chest')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('exercise_pill_bench_press_triceps')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('most-used ordering can be inverted in list mode', (
+    tester,
+  ) async {
     await _pumpExerciseList(
       tester,
       exercises: const [
         ExerciseWithLabels(id: 'alpha', name: 'Alpha Press', labels: ['chest']),
         ExerciseWithLabels(id: 'beta', name: 'Beta Press', labels: ['chest']),
       ],
-      logCountMap: const {
-        'alpha': 6,
-        'beta': 1,
-      },
+      logCountMap: const {'alpha': 6, 'beta': 1},
     );
 
     await tester.tap(
@@ -82,19 +111,23 @@ void main() {
     await tester.tap(find.text('Most used').last);
     await tester.pumpAndSettle();
 
-    final alphaBefore =
-        tester.getTopLeft(find.byKey(const Key('exercise_list_alpha'))).dy;
-    final betaBefore =
-        tester.getTopLeft(find.byKey(const Key('exercise_list_beta'))).dy;
+    final alphaBefore = tester
+        .getTopLeft(find.byKey(const Key('exercise_list_alpha')))
+        .dy;
+    final betaBefore = tester
+        .getTopLeft(find.byKey(const Key('exercise_list_beta')))
+        .dy;
     expect(alphaBefore, lessThan(betaBefore));
 
     await tester.tap(find.byKey(const Key('exercises_order_invert_button')));
     await tester.pumpAndSettle();
 
-    final alphaAfter =
-        tester.getTopLeft(find.byKey(const Key('exercise_list_alpha'))).dy;
-    final betaAfter =
-        tester.getTopLeft(find.byKey(const Key('exercise_list_beta'))).dy;
+    final alphaAfter = tester
+        .getTopLeft(find.byKey(const Key('exercise_list_alpha')))
+        .dy;
+    final betaAfter = tester
+        .getTopLeft(find.byKey(const Key('exercise_list_beta')))
+        .dy;
     expect(alphaAfter, greaterThan(betaAfter));
   });
 
@@ -128,7 +161,9 @@ void main() {
     expect(find.text('Pull-Up'), findsOneWidget);
   });
 
-  testWidgets('delete mode keeps pills format when pills selected', (tester) async {
+  testWidgets('delete mode keeps pills format when pills selected', (
+    tester,
+  ) async {
     await _pumpExerciseList(
       tester,
       exercises: const [
@@ -144,7 +179,9 @@ void main() {
     expect(find.byType(ActionChip), findsWidgets);
   });
 
-  testWidgets('delete mode keeps list format when list selected', (tester) async {
+  testWidgets('delete mode keeps list format when list selected', (
+    tester,
+  ) async {
     await _pumpExerciseList(
       tester,
       exercises: const [
@@ -225,7 +262,9 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Restore'), findsOneWidget);
   });
 
-  testWidgets('tapping empty area clears delete mode selection', (tester) async {
+  testWidgets('tapping empty area clears delete mode selection', (
+    tester,
+  ) async {
     await _pumpExerciseList(
       tester,
       exercises: const [
@@ -280,11 +319,16 @@ void main() {
     final divisionCenter = tester.getCenter(
       find.byKey(const Key('exercises_grouping_dropdown')),
     );
-    final addCenter = tester.getCenter(find.byKey(const Key('exercises_add_button')));
+    final addCenter = tester.getCenter(
+      find.byKey(const Key('exercises_add_button')),
+    );
     expect((divisionCenter.dy - addCenter.dy).abs(), lessThan(6));
     expect(addCenter.dx, greaterThan(divisionCenter.dx));
     expect(find.byKey(const Key('exercises_order_dropdown')), findsOneWidget);
-    expect(find.byKey(const Key('exercises_toggle_hidden_button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('exercises_toggle_hidden_button')),
+      findsOneWidget,
+    );
   });
 }
 
@@ -306,9 +350,7 @@ Future<void> _pumpExerciseList(
           (ref) => Stream.value(logCountMap),
         ),
       ],
-      child: const MaterialApp(
-        home: Scaffold(body: ExerciseListContent()),
-      ),
+      child: const MaterialApp(home: Scaffold(body: ExerciseListContent())),
     ),
   );
   await tester.pumpAndSettle();

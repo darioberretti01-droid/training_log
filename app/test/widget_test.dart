@@ -54,6 +54,6 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Barbell Bench Press'), findsOneWidget);
+    expect(find.text('Barbell Bench Press'), findsWidgets);
   });
 }

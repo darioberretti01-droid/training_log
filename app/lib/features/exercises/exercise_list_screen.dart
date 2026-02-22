@@ -37,7 +37,8 @@ class ExerciseListContent extends ConsumerStatefulWidget {
   const ExerciseListContent({super.key});
 
   @override
-  ConsumerState<ExerciseListContent> createState() => _ExerciseListContentState();
+  ConsumerState<ExerciseListContent> createState() =>
+      _ExerciseListContentState();
 }
 
 class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
@@ -65,14 +66,18 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     return seedState.when(
       data: (_) {
         final exercisesState = ref.watch(exercisesProvider);
-        final createdAtMap = ref.watch(exerciseCreatedAtMapProvider).maybeWhen(
-          data: (value) => value,
-          orElse: () => const <String, int>{},
-        );
-        final logCountMap = ref.watch(exerciseLogCountMapProvider).maybeWhen(
-          data: (value) => value,
-          orElse: () => const <String, int>{},
-        );
+        final createdAtMap = ref
+            .watch(exerciseCreatedAtMapProvider)
+            .maybeWhen(
+              data: (value) => value,
+              orElse: () => const <String, int>{},
+            );
+        final logCountMap = ref
+            .watch(exerciseLogCountMapProvider)
+            .maybeWhen(
+              data: (value) => value,
+              orElse: () => const <String, int>{},
+            );
         return exercisesState.when(
           data: (exercises) =>
               _buildLoaded(context, exercises, createdAtMap, logCountMap),
@@ -100,6 +105,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     final addActionColor = Theme.of(context).colorScheme.primary;
     final items = _toFilteredItems(exercises, createdAtMap, logCountMap);
     final sections = _buildSections(items);
+    final itemSectionCount = _itemSectionCount(sections);
 
     return PopScope(
       canPop: false,
@@ -131,7 +137,9 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                 ),
               )
             else
-              ...sections.map((section) => _buildSection(context, section)),
+              ...sections.map(
+                (section) => _buildSection(context, section, itemSectionCount),
+              ),
           ],
         ),
       ),
@@ -148,7 +156,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     }
   }
 
-  Widget _buildPossiblyBlurredTopControls(BuildContext context, Color addActionColor) {
+  Widget _buildPossiblyBlurredTopControls(
+    BuildContext context,
+    Color addActionColor,
+  ) {
     final controls = Column(
       children: [
         _buildSearchField(),
@@ -190,7 +201,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     );
   }
 
-  Widget _buildDivisionAndAddControls(BuildContext context, Color addActionColor) {
+  Widget _buildDivisionAndAddControls(
+    BuildContext context,
+    Color addActionColor,
+  ) {
     final divisionDropdown = DropdownButtonFormField<_ExerciseDivision>(
       key: const Key('exercises_grouping_dropdown'),
       initialValue: _division,
@@ -204,7 +218,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
           .map(
             (value) => DropdownMenuItem(
               value: value,
-              child: Text(_divisionLabel(value), overflow: TextOverflow.ellipsis),
+              child: Text(
+                _divisionLabel(value),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           )
           .toList(growable: false),
@@ -219,10 +236,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     final addButton = ActionChip(
       key: const Key('exercises_add_button'),
       avatar: Icon(Icons.add, size: 18, color: addActionColor),
-      label: Text(
-        'ADD EXERCISE',
-        style: TextStyle(color: addActionColor),
-      ),
+      label: Text('ADD EXERCISE', style: TextStyle(color: addActionColor)),
       onPressed: () => context.push('/exercises/new'),
     );
 
@@ -255,7 +269,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
           .map(
             (value) => DropdownMenuItem(
               value: value,
-              child: Text(_orderingLabel(value), overflow: TextOverflow.ellipsis),
+              child: Text(
+                _orderingLabel(value),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           )
           .toList(growable: false),
@@ -318,10 +335,14 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                 onPressed: _isMutating
                     ? null
                     : () {
-                        setState(() => _showHiddenExercises = !_showHiddenExercises);
+                        setState(
+                          () => _showHiddenExercises = !_showHiddenExercises,
+                        );
                       },
                 icon: Icon(
-                  _showHiddenExercises ? Icons.visibility_off : Icons.visibility,
+                  _showHiddenExercises
+                      ? Icons.visibility_off
+                      : Icons.visibility,
                   size: 18,
                 ),
                 label: Text(
@@ -436,13 +457,31 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
 
     if (_division == _ExerciseDivision.allExercises) {
       byTitle[definitions.first.title]!.addAll(items);
-      return [
-        _ExerciseSection(title: definitions.first.title, items: items),
-      ];
+      return [_ExerciseSection(title: definitions.first.title, items: items)];
     }
 
     final otherSection = definitions.last;
     for (final item in items) {
+      if (_division == _ExerciseDivision.muscles) {
+        final matches = <_DivisionSection>[];
+        for (final section in definitions) {
+          if (section.isOther) {
+            continue;
+          }
+          if (item.matches(section.labelMatchers)) {
+            matches.add(section);
+          }
+        }
+        if (matches.isEmpty) {
+          byTitle[otherSection.title]!.add(item);
+          continue;
+        }
+        for (final section in matches) {
+          byTitle[section.title]!.add(item);
+        }
+        continue;
+      }
+
       _DivisionSection? matched;
       for (final section in definitions) {
         if (section.isOther) {
@@ -453,8 +492,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
           break;
         }
       }
-      final targetTitle = matched?.title ?? otherSection.title;
-      byTitle[targetTitle]!.add(item);
+      byTitle[matched?.title ?? otherSection.title]!.add(item);
     }
 
     final output = <_ExerciseSection>[];
@@ -468,10 +506,28 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     return output;
   }
 
-  Widget _buildSection(BuildContext context, _ExerciseSection section) {
-    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
-      fontWeight: FontWeight.w700,
-    );
+  Map<String, int> _itemSectionCount(List<_ExerciseSection> sections) {
+    final counts = <String, int>{};
+    for (final section in sections) {
+      for (final item in section.items) {
+        counts.update(
+          item.exercise.id,
+          (value) => value + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
+    return counts;
+  }
+
+  Widget _buildSection(
+    BuildContext context,
+    _ExerciseSection section,
+    Map<String, int> itemSectionCount,
+  ) {
+    final titleStyle = Theme.of(
+      context,
+    ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700);
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -484,7 +540,14 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
               spacing: 8,
               runSpacing: 8,
               children: section.items
-                  .map((item) => _buildExercisePill(context, item))
+                  .map(
+                    (item) => _buildExercisePill(
+                      context,
+                      item,
+                      section.title,
+                      itemSectionCount,
+                    ),
+                  )
                   .toList(growable: false),
             )
           else if (_isDeleteMode)
@@ -498,7 +561,12 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildDeleteModeTile(context, item),
+                      _buildDeleteModeTile(
+                        context,
+                        item,
+                        section.title,
+                        itemSectionCount,
+                      ),
                       if (!isLast) const Divider(height: 1),
                     ],
                   );
@@ -517,14 +585,22 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ListTile(
-                        key: Key('exercise_list_${item.exercise.id}'),
+                        key: _exerciseKey(
+                          prefix: 'exercise_list',
+                          exerciseId: item.exercise.id,
+                          sectionTitle: section.title,
+                          itemSectionCount: itemSectionCount,
+                        ),
                         title: Text(item.exercise.name),
                         subtitle: item.exercise.labels.isEmpty
                             ? null
                             : Text(item.exercise.labels.join(', ')),
                         onTap: _isMutating
                             ? null
-                            : () => _handleExercisePressed(context, item.exercise),
+                            : () => _handleExercisePressed(
+                                context,
+                                item.exercise,
+                              ),
                       ),
                       if (!isLast) const Divider(height: 1),
                     ],
@@ -537,10 +613,20 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     );
   }
 
-  Widget _buildExercisePill(BuildContext context, _ExerciseListItem item) {
+  Widget _buildExercisePill(
+    BuildContext context,
+    _ExerciseListItem item,
+    String sectionTitle,
+    Map<String, int> itemSectionCount,
+  ) {
     final exercise = item.exercise;
     return ActionChip(
-      key: Key('exercise_pill_${exercise.id}'),
+      key: _exerciseKey(
+        prefix: 'exercise_pill',
+        exerciseId: exercise.id,
+        sectionTitle: sectionTitle,
+        itemSectionCount: itemSectionCount,
+      ),
       label: Text(exercise.name),
       onPressed: _isMutating
           ? null
@@ -554,36 +640,75 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     );
   }
 
-  Widget _buildDeleteModeTile(BuildContext context, _ExerciseListItem item) {
+  Widget _buildDeleteModeTile(
+    BuildContext context,
+    _ExerciseListItem item,
+    String sectionTitle,
+    Map<String, int> itemSectionCount,
+  ) {
     final exercise = item.exercise;
     final isArmed = _armedExerciseId == exercise.id;
     final errorContainer = Theme.of(context).colorScheme.errorContainer;
 
     return ListTile(
-      key: Key('exercise_delete_tile_${exercise.id}'),
+      key: _exerciseKey(
+        prefix: 'exercise_delete_tile',
+        exerciseId: exercise.id,
+        sectionTitle: sectionTitle,
+        itemSectionCount: itemSectionCount,
+      ),
       tileColor: isArmed ? errorContainer.withValues(alpha: 0.65) : null,
       title: Text(exercise.name),
-      subtitle: exercise.labels.isEmpty ? null : Text(exercise.labels.join(', ')),
+      subtitle: exercise.labels.isEmpty
+          ? null
+          : Text(exercise.labels.join(', ')),
       trailing: exercise.isStandard
           ? OutlinedButton(
-              key: Key('exercise_hide_${exercise.id}'),
+              key: _exerciseKey(
+                prefix: 'exercise_hide',
+                exerciseId: exercise.id,
+                sectionTitle: sectionTitle,
+                itemSectionCount: itemSectionCount,
+              ),
               onPressed: _isMutating
                   ? null
                   : () => _confirmHideOrRestoreStandardExercise(exercise),
               child: Text(exercise.isHidden ? 'RESTORE' : 'HIDE'),
             )
           : IconButton(
-              key: Key('exercise_delete_${exercise.id}'),
-              onPressed:
-                  _isMutating ? null : () => _confirmDeleteCustomExercise(exercise),
+              key: _exerciseKey(
+                prefix: 'exercise_delete',
+                exerciseId: exercise.id,
+                sectionTitle: sectionTitle,
+                itemSectionCount: itemSectionCount,
+              ),
+              onPressed: _isMutating
+                  ? null
+                  : () => _confirmDeleteCustomExercise(exercise),
               icon: _DeleteCircleTrashIcon(
                 color: isArmed ? Theme.of(context).colorScheme.error : null,
               ),
             ),
-      onTap: _isMutating
-          ? null
-          : () => _onDeleteModeExerciseTap(exercise),
+      onTap: _isMutating ? null : () => _onDeleteModeExerciseTap(exercise),
     );
+  }
+
+  Key _exerciseKey({
+    required String prefix,
+    required String exerciseId,
+    required String sectionTitle,
+    required Map<String, int> itemSectionCount,
+  }) {
+    final count = itemSectionCount[exerciseId] ?? 1;
+    if (count <= 1) {
+      return Key('${prefix}_$exerciseId');
+    }
+    final sectionToken = sectionTitle
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+    return Key('${prefix}_${exerciseId}_$sectionToken');
   }
 
   void _onDeleteModeExerciseTap(ExerciseWithLabels exercise) {
@@ -594,7 +719,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     _confirmDeleteCustomExercise(exercise);
   }
 
-  void _handleExercisePressed(BuildContext context, ExerciseWithLabels exercise) {
+  void _handleExercisePressed(
+    BuildContext context,
+    ExerciseWithLabels exercise,
+  ) {
     if (_showHiddenExercises && exercise.isStandard && exercise.isHidden) {
       _confirmHideOrRestoreStandardExercise(exercise);
       return;
@@ -634,7 +762,9 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     if (shouldDelete == true) {
       setState(() => _isMutating = true);
       try {
-        await ref.read(exerciseRepositoryProvider).deleteCustomExercise(exercise.id);
+        await ref
+            .read(exerciseRepositoryProvider)
+            .deleteCustomExercise(exercise.id);
       } finally {
         if (mounted) {
           setState(() => _isMutating = false);
@@ -724,7 +854,9 @@ class _ExerciseListItem {
     required this.createdAtMs,
     required this.logCount,
   }) : nameLower = exercise.name.toLowerCase(),
-       labelsLower = exercise.labels.map((label) => label.toLowerCase()).toSet();
+       labelsLower = exercise.labels
+           .map((label) => label.toLowerCase())
+           .toSet();
 
   final ExerciseWithLabels exercise;
   final int createdAtMs;
@@ -736,10 +868,7 @@ class _ExerciseListItem {
 }
 
 class _ExerciseSection {
-  const _ExerciseSection({
-    required this.title,
-    required this.items,
-  });
+  const _ExerciseSection({required this.title, required this.items});
 
   final String title;
   final List<_ExerciseListItem> items;
@@ -761,7 +890,10 @@ List<_DivisionSection> _divisionSections(_ExerciseDivision division) {
   switch (division) {
     case _ExerciseDivision.muscles:
       return const [
-        _DivisionSection(title: 'Chest', labelMatchers: {'chest', 'upper pecs'}),
+        _DivisionSection(
+          title: 'Chest',
+          labelMatchers: {'chest', 'upper pecs'},
+        ),
         _DivisionSection(
           title: 'Back',
           labelMatchers: {'back', 'upper back', 'lats'},
@@ -868,9 +1000,7 @@ class _DeleteCircleTrashIcon extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: SizedBox(
         width: 18,
