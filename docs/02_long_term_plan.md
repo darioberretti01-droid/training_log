@@ -2,7 +2,7 @@
 
 This document tracks the product roadmap and current status.
 
-## Current Status (as of 2026-02-21)
+## Current Status (as of 2026-02-22)
 - Environment setup complete (Flutter + Android toolchain verified).
 - Phase 1A implemented:
   - local DB schema (exercises, labels, sessions, performed sets)
@@ -45,6 +45,10 @@ This document tracks the product roadmap and current status.
     - custom exercises
     - temporary label overrides for standard exercises
     - restore-standard-labels flow for overridden standard exercises
+  - split volume visualization added:
+    - full muscle-volume overview in split builder/edit with selectable control labels
+    - lightweight muscle-volume summary in split detail view
+  - standard label set expanded with: `glutes`, `forearms`, `back`, `abs`
 
 ## Roadmap
 
@@ -82,8 +86,10 @@ Phase 1B (in progress):
   - split builder create flow (name, ordered days, planned exercises, set/rep/rest/RPE targets)
   - split browse UI with active split section and full split list
   - bottom-tab root shell with dedicated Home/Splits/Exercises sections
+  - split muscle-volume overview (per-day + whole-split sets) in builder/edit/detail
+  - control-label based split volume tracking with default muscles:
+    - chest, back, shoulders, biceps, triceps, quads, glutes, hamstrings
 - next:
-  - summary screen: set volume by label/muscle group
   - launch workout from day plan
   - workout screen references: last / best-in-split / best all-time
   - connect home quick actions to actual workout flows (currently placeholders)

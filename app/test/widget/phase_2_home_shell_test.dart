@@ -176,6 +176,10 @@ void main() {
     expect(find.text('Days'), findsOneWidget);
     expect(find.byKey(const Key('split_detail_edit')), findsOneWidget);
     expect(find.byKey(const Key('split_detail_delete')), findsOneWidget);
+    expect(
+      find.byKey(const Key('split_detail_volume_overview')),
+      findsOneWidget,
+    );
   });
 }
 
@@ -206,7 +210,8 @@ class _FakeSplitRepository implements SplitRepository {
   Future<void> deleteSplit(String splitId) async {}
 
   @override
-  Future<SplitDetails?> getSplitById(String splitId) async => detailsById[splitId];
+  Future<SplitDetails?> getSplitById(String splitId) async =>
+      detailsById[splitId];
 
   @override
   Future<void> setActiveSplit(String splitId) async {}

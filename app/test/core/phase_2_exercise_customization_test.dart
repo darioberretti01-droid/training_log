@@ -21,23 +21,26 @@ void main() {
     await database.close();
   });
 
-  test('createExercise stores a custom exercise and mirrors it into main DB', () async {
-    final exerciseId = await repository.createExercise(
-      name: 'Cable Fly',
-      labels: const ['chest', 'isolation'],
-    );
+  test(
+    'createExercise stores a custom exercise and mirrors it into main DB',
+    () async {
+      final exerciseId = await repository.createExercise(
+        name: 'Cable Fly',
+        labels: const ['chest', 'isolation'],
+      );
 
-    final custom = await repository.getById(exerciseId);
-    expect(custom, isNotNull);
-    expect(custom!.isStandard, false);
-    expect(custom.labels, ['chest', 'isolation']);
+      final custom = await repository.getById(exerciseId);
+      expect(custom, isNotNull);
+      expect(custom!.isStandard, false);
+      expect(custom.labels, ['chest', 'isolation']);
 
-    final mirrored = await (database.select(
-      database.exercises,
-    )..where((tbl) => tbl.id.equals(exerciseId))).getSingleOrNull();
-    expect(mirrored, isNotNull);
-    expect(mirrored!.isSeeded, false);
-  });
+      final mirrored = await (database.select(
+        database.exercises,
+      )..where((tbl) => tbl.id.equals(exerciseId))).getSingleOrNull();
+      expect(mirrored, isNotNull);
+      expect(mirrored!.isSeeded, false);
+    },
+  );
 
   test('standard labels can be overridden and restored', () async {
     await repository.seedIfEmpty();
@@ -73,58 +76,61 @@ void main() {
   test('createLabel adds label to global label catalog', () async {
     await repository.seedIfEmpty();
 
-    final created = await repository.createLabel('forearms');
+    final created = await repository.createLabel('neck');
 
     expect(created, true);
     final labels = await repository.getAllLabels();
-    expect(labels, contains('forearms'));
+    expect(labels, contains('neck'));
   });
 
-  test('hide and unhide standard label updates visible and catalog states', () async {
-    await repository.seedIfEmpty();
+  test(
+    'hide and unhide standard label updates visible and catalog states',
+    () async {
+      await repository.seedIfEmpty();
 
-    final hidden = await repository.hideStandardLabel('push');
-    expect(hidden, true);
+      final hidden = await repository.hideStandardLabel('push');
+      expect(hidden, true);
 
-    final visibleLabels = await repository.getAllLabels();
-    expect(visibleLabels, isNot(contains('push')));
+      final visibleLabels = await repository.getAllLabels();
+      expect(visibleLabels, isNot(contains('push')));
 
-    final catalog = await repository.watchLabelCatalog().first;
-    final pushEntry = catalog.firstWhere((entry) => entry.name == 'push');
-    expect(pushEntry.isStandard, true);
-    expect(pushEntry.isHidden, true);
+      final catalog = await repository.watchLabelCatalog().first;
+      final pushEntry = catalog.firstWhere((entry) => entry.name == 'push');
+      expect(pushEntry.isStandard, true);
+      expect(pushEntry.isHidden, true);
 
-    final unhidden = await repository.unhideStandardLabel('push');
-    expect(unhidden, true);
+      final unhidden = await repository.unhideStandardLabel('push');
+      expect(unhidden, true);
 
-    final visibleAfterRestore = await repository.getAllLabels();
-    expect(visibleAfterRestore, contains('push'));
-  });
+      final visibleAfterRestore = await repository.getAllLabels();
+      expect(visibleAfterRestore, contains('push'));
+    },
+  );
 
   test('delete custom label returns snapshot and can be restored', () async {
     await repository.seedIfEmpty();
 
     final exerciseId = await repository.createExercise(
       name: 'Custom',
-      labels: const ['forearms'],
+      labels: const ['neck'],
     );
 
     final beforeDelete = await repository.getById(exerciseId);
     expect(beforeDelete, isNotNull);
-    expect(beforeDelete!.labels, contains('forearms'));
+    expect(beforeDelete!.labels, contains('neck'));
 
-    final snapshot = await repository.deleteCustomLabel('forearms');
+    final snapshot = await repository.deleteCustomLabel('neck');
     expect(snapshot, isNotNull);
 
     final afterDelete = await repository.getById(exerciseId);
     expect(afterDelete, isNotNull);
-    expect(afterDelete!.labels, isNot(contains('forearms')));
+    expect(afterDelete!.labels, isNot(contains('neck')));
 
     await repository.restoreDeletedCustomLabel(snapshot!);
 
     final afterRestore = await repository.getById(exerciseId);
     expect(afterRestore, isNotNull);
-    expect(afterRestore!.labels, contains('forearms'));
+    expect(afterRestore!.labels, contains('neck'));
   });
 
   test('standard exercise can be hidden and unhidden', () async {

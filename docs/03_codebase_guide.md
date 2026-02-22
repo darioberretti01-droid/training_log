@@ -59,6 +59,8 @@ App source (`app/lib`):
   - `split_builder_screen.dart`
   - `splits_screen.dart`
   - `split_repository.dart`
+  - `split_volume.dart`
+  - `split_volume_widgets.dart`
 - `features/home/home_screen.dart`
   - lightweight Home/Other tab content
 - `ui/app_router.dart`
@@ -216,8 +218,16 @@ Screen behavior:
 - Split builder:
   - creates a split with ordered days and ordered planned exercises
   - captures target sets, rep range, optional rest and target RPE
+  - includes a live muscle-volume overview (sets per muscle per day + whole split) based on exercise labels
+  - whole-split section uses bar-style per-label set visualization
+  - control labels are edited from a button near the whole-split section (opens a selector dialog)
+  - day cards only show control labels with non-zero sets for that day
+  - default control labels: chest, back, shoulders, biceps, triceps, quads, glutes, hamstrings
   - save writes split/day/planned rows transactionally via `SplitRepository`
   - optional toggle sets the new split as active
+- Split detail:
+  - includes a lightweight muscle-volume summary (whole split + per-day labels)
+  - summary uses the default control-label set and planned set counts
 - Quick workout:
   - starts with 3 set rows
   - required: reps and weight

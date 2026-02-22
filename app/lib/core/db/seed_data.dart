@@ -14,27 +14,45 @@ const seededExercises = <SeedExercise>[
   SeedExercise(
     id: 'back_squat',
     name: 'Back Squat',
-    labels: ['legs', 'quads', 'compound'],
+    labels: ['legs', 'quads', 'glutes', 'abs', 'compound'],
   ),
   SeedExercise(
     id: 'front_squat',
     name: 'Front Squat',
-    labels: ['legs', 'quads', 'compound'],
+    labels: ['legs', 'quads', 'glutes', 'abs', 'compound'],
   ),
   SeedExercise(
     id: 'leg_press',
     name: 'Leg Press',
-    labels: ['legs', 'quads', 'compound'],
+    labels: ['legs', 'quads', 'glutes', 'compound'],
   ),
   SeedExercise(
     id: 'romanian_deadlift',
     name: 'Romanian Deadlift',
-    labels: ['legs', 'hamstrings', 'posterior chain', 'compound'],
+    labels: [
+      'legs',
+      'hamstrings',
+      'glutes',
+      'back',
+      'forearms',
+      'abs',
+      'posterior chain',
+      'compound',
+    ],
   ),
   SeedExercise(
     id: 'conventional_deadlift',
     name: 'Conventional Deadlift',
-    labels: ['pull', 'posterior chain', 'compound'],
+    labels: [
+      'pull',
+      'back',
+      'hamstrings',
+      'glutes',
+      'forearms',
+      'abs',
+      'posterior chain',
+      'compound',
+    ],
   ),
   SeedExercise(
     id: 'bench_press',
@@ -49,7 +67,7 @@ const seededExercises = <SeedExercise>[
   SeedExercise(
     id: 'overhead_press',
     name: 'Overhead Press',
-    labels: ['push', 'shoulders', 'triceps', 'compound'],
+    labels: ['push', 'shoulders', 'triceps', 'abs', 'compound'],
   ),
   SeedExercise(
     id: 'dips',
@@ -64,37 +82,60 @@ const seededExercises = <SeedExercise>[
   SeedExercise(
     id: 'pull_up',
     name: 'Pull-Up',
-    labels: ['pull', 'lats', 'biceps', 'compound'],
+    labels: ['pull', 'back', 'lats', 'biceps', 'forearms', 'compound'],
   ),
   SeedExercise(
     id: 'lat_pulldown',
     name: 'Lat Pulldown',
-    labels: ['pull', 'lats', 'biceps', 'compound'],
+    labels: ['pull', 'back', 'lats', 'biceps', 'forearms', 'compound'],
   ),
   SeedExercise(
     id: 'barbell_row',
     name: 'Barbell Row',
-    labels: ['pull', 'upper back', 'lats', 'compound'],
+    labels: [
+      'pull',
+      'back',
+      'upper back',
+      'lats',
+      'biceps',
+      'forearms',
+      'compound',
+    ],
   ),
   SeedExercise(
     id: 'seated_cable_row',
     name: 'Seated Cable Row',
-    labels: ['pull', 'upper back', 'lats', 'compound'],
+    labels: [
+      'pull',
+      'back',
+      'upper back',
+      'lats',
+      'biceps',
+      'forearms',
+      'compound',
+    ],
   ),
   SeedExercise(
     id: 'face_pull',
     name: 'Face Pull',
-    labels: ['pull', 'rear delts', 'upper back', 'isolation'],
+    labels: [
+      'pull',
+      'back',
+      'rear delts',
+      'upper back',
+      'forearms',
+      'isolation',
+    ],
   ),
   SeedExercise(
     id: 'barbell_curl',
     name: 'Barbell Curl',
-    labels: ['pull', 'arms', 'biceps', 'isolation'],
+    labels: ['pull', 'arms', 'biceps', 'forearms', 'isolation'],
   ),
   SeedExercise(
     id: 'incline_dumbbell_curl',
     name: 'Incline Dumbbell Curl',
-    labels: ['pull', 'arms', 'biceps', 'isolation'],
+    labels: ['pull', 'arms', 'biceps', 'forearms', 'isolation'],
   ),
   SeedExercise(
     id: 'triceps_pushdown',
@@ -116,5 +157,7 @@ const seededExercises = <SeedExercise>[
 String labelIdFromName(String name) {
   final normalized = name.toLowerCase().trim();
   final cleaned = normalized.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
-  return cleaned.replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '');
+  return cleaned
+      .replaceAll(RegExp(r'_+'), '_')
+      .replaceAll(RegExp(r'^_|_$'), '');
 }

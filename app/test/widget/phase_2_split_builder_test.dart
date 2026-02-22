@@ -17,6 +17,27 @@ void main() {
       await tester.tap(find.byKey(const Key('split_builder_save')));
       await tester.pumpAndSettle();
 
+      expect(
+        find.byKey(const Key('split_builder_volume_overview')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('split_volume_control_labels_button')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const Key('split_volume_control_labels_button')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('split_volume_control_labels_dialog')),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(FilterChip, 'chest'), findsOneWidget);
+      expect(find.widgetWithText(FilterChip, 'back'), findsOneWidget);
+      expect(find.widgetWithText(FilterChip, 'glutes'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
       expect(find.text('Split name is required.'), findsOneWidget);
       expect(repository.createCalls, 0);
     },
@@ -32,8 +53,18 @@ void main() {
       find.byKey(const Key('split_name_field')),
       'Upper Lower',
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_title')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(find.byKey(const Key('day_1_title')), 'Upper A');
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_exercise_1')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.byKey(const Key('day_1_exercise_1')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Barbell Bench Press').last);
@@ -64,6 +95,8 @@ void main() {
     tester,
   ) async {
     final repository = _FakeSplitRepository();
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -90,6 +123,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_exercise_1')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.byKey(const Key('day_1_exercise_1')));
     await tester.pumpAndSettle();
 
@@ -128,6 +166,8 @@ void main() {
           ),
         ],
       );
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
       ProviderScope(
@@ -139,6 +179,11 @@ void main() {
                 id: 'bench_press',
                 name: 'Barbell Bench Press',
                 labels: ['push', 'chest'],
+              ),
+              ExerciseWithLabels(
+                id: 'pull_up',
+                name: 'Pull-Up',
+                labels: ['pull', 'back'],
               ),
             ]),
           ),
@@ -155,7 +200,30 @@ void main() {
     expect(find.text('Upper Lower'), findsOneWidget);
     expect(find.text('Upper A'), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('split_name_field')), 'Updated UL');
+    await tester.enterText(
+      find.byKey(const Key('split_name_field')),
+      'Updated UL',
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_add_exercise')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('day_1_add_exercise')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('day_1_exercise_2')), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_exercise_2')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('day_1_exercise_2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pull-Up').last);
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byKey(const Key('split_builder_save')));
     await tester.pumpAndSettle();
 
@@ -163,6 +231,18 @@ void main() {
     expect(repository.lastUpdatedSplitId, 'split_1');
     expect(repository.lastUpdatedInput, isNotNull);
     expect(repository.lastUpdatedInput!.name, 'Updated UL');
+    expect(
+      repository.lastUpdatedInput!.days.single.plannedExercises,
+      hasLength(2),
+    );
+    expect(
+      repository.lastUpdatedInput!.days.single.plannedExercises[1].exerciseId,
+      'pull_up',
+    );
+    expect(
+      repository.lastUpdatedInput!.days.single.plannedExercises[1].orderIndex,
+      2,
+    );
     expect(repository.createCalls, 0);
   });
 }
@@ -171,6 +251,8 @@ Future<void> _pumpSplitBuilder(
   WidgetTester tester,
   _FakeSplitRepository repository,
 ) async {
+  await tester.binding.setSurfaceSize(const Size(800, 1600));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -212,7 +294,8 @@ class _FakeSplitRepository implements SplitRepository {
   Future<void> deleteSplit(String splitId) async {}
 
   @override
-  Future<SplitDetails?> getSplitById(String splitId) async => detailsById[splitId];
+  Future<SplitDetails?> getSplitById(String splitId) async =>
+      detailsById[splitId];
 
   @override
   Future<void> setActiveSplit(String splitId) async {

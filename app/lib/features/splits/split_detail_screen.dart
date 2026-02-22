@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/models/exercise_with_labels.dart';
 import '../../core/state/providers.dart';
 import 'split_repository.dart';
+import 'split_volume.dart';
+import 'split_volume_widgets.dart';
 
 class SplitDetailScreen extends ConsumerStatefulWidget {
   const SplitDetailScreen({required this.splitId, super.key});
@@ -94,17 +97,17 @@ class _SplitDetailScreenState extends ConsumerState<SplitDetailScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Split deleted.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Split deleted.')));
       context.go('/splits');
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete split: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not delete split: $error')));
     } finally {
       if (mounted) {
         setState(() => _isDeleting = false);
@@ -113,14 +116,15 @@ class _SplitDetailScreenState extends ConsumerState<SplitDetailScreen> {
   }
 }
 
-class _SplitDetailBody extends StatelessWidget {
+class _SplitDetailBody extends ConsumerWidget {
   const _SplitDetailBody({required this.details});
 
   final SplitDetails details;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final updatedAt = DateTime.fromMillisecondsSinceEpoch(details.updatedAt);
+    final exercisesState = ref.watch(exercisesProvider);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -144,6 +148,26 @@ class _SplitDetailBody extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        exercisesState.when(
+          data: (exercises) => SplitDetailMuscleVolumeCard(
+            summary: _buildMuscleVolumeSummary(exercises),
+          ),
+          loading: () => const Card(
+            key: Key('split_detail_volume_overview'),
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('Loading volume by muscle...'),
+            ),
+          ),
+          error: (error, _) => Card(
+            key: const Key('split_detail_volume_overview'),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text('Could not load volume by muscle: $error'),
+            ),
+          ),
+        ),
         const SizedBox(height: 14),
         const Text(
           'Days',
@@ -159,6 +183,38 @@ class _SplitDetailBody extends StatelessWidget {
           ),
         ...details.days.map((day) => _DayDetailsCard(day: day)),
       ],
+    );
+  }
+
+  SplitMuscleVolumeSummary _buildMuscleVolumeSummary(
+    List<ExerciseWithLabels> exercises,
+  ) {
+    final exerciseLabelsById = <String, List<String>>{};
+    for (final exercise in exercises) {
+      exerciseLabelsById[exercise.id] = exercise.labels;
+    }
+
+    final dayInputs = details.days
+        .map(
+          (day) => SplitVolumeDayInput(
+            dayIndex: day.dayIndex,
+            dayTitle: day.title,
+            exercises: day.plannedExercises
+                .map(
+                  (planned) => SplitVolumeExerciseInput(
+                    exerciseId: planned.exerciseId,
+                    targetSets: planned.targetSets,
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        )
+        .toList(growable: false);
+
+    return summarizeSplitMuscleVolume(
+      days: dayInputs,
+      exerciseLabelsById: exerciseLabelsById,
+      trackedMuscleLabels: defaultSplitVolumeControlLabels,
     );
   }
 }

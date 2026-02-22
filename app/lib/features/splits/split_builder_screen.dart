@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/state/providers.dart';
 import 'split_repository.dart';
+import 'split_volume.dart';
+import 'split_volume_widgets.dart';
 
 class SplitBuilderScreen extends ConsumerStatefulWidget {
   const SplitBuilderScreen({super.key, this.editingSplitId});
@@ -18,6 +20,10 @@ class SplitBuilderScreen extends ConsumerStatefulWidget {
 class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
   final TextEditingController _splitNameController = TextEditingController();
   final List<_DayDraft> _days = [_DayDraft()];
+  final List<String> _selectedVolumeControlLabels = [
+    ...defaultSplitVolumeControlLabels,
+  ];
+  final Set<String> _manuallyCreatedControlLabels = {};
   bool _setAsActive = true;
   bool _isSaving = false;
   bool _didHydrateFromExisting = false;
@@ -114,12 +120,12 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
           ),
         );
       },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _BuilderErrorState(
-          message: 'Failed to initialize exercise data: $error',
-          onRetry: () => ref.invalidate(seedDataProvider),
-        ),
-      );
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => _BuilderErrorState(
+        message: 'Failed to initialize exercise data: $error',
+        onRetry: () => ref.invalidate(seedDataProvider),
+      ),
+    );
   }
 
   List<ExerciseWithLabels> _filterExercisesForBuilder(
@@ -137,7 +143,8 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
 
     return exercises
         .where(
-          (exercise) => !exercise.isHidden || selectedExerciseIds.contains(exercise.id),
+          (exercise) =>
+              !exercise.isHidden || selectedExerciseIds.contains(exercise.id),
         )
         .toList(growable: false);
   }
@@ -162,13 +169,10 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
               rpe: planned.targetRpe?.toString() ?? '',
             ),
           )
-          .toList(growable: false);
+          .toList();
 
       _days.add(
-        _DayDraft(
-          title: day.title,
-          plannedExercises: plannedExercises,
-        ),
+        _DayDraft(title: day.title, plannedExercises: plannedExercises),
       );
     }
     if (_days.isEmpty) {
@@ -181,6 +185,8 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
   }
 
   Widget _buildBody(BuildContext context, List<ExerciseWithLabels> exercises) {
+    final volumeSummary = _buildMuscleVolumeSummary(exercises);
+    final availableControlLabels = _buildAvailableControlLabels(exercises);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -223,7 +229,34 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
             ),
           ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
+        SplitBuilderMuscleVolumeCard(
+          summary: volumeSummary,
+          availableControlLabels: availableControlLabels,
+          selectedControlLabels: _selectedVolumeControlLabels,
+          onControlLabelsChanged: (labels) {
+            setState(() {
+              _selectedVolumeControlLabels
+                ..clear()
+                ..addAll(normalizeSplitVolumeControlLabels(labels));
+            });
+          },
+          onCreateControlLabel: (label) async {
+            final created = await ref
+                .read(exerciseRepositoryProvider)
+                .createLabel(label);
+            if (created) {
+              setState(() {
+                final normalized = normalizeSplitVolumeControlLabels([label]);
+                if (normalized.isNotEmpty) {
+                  _manuallyCreatedControlLabels.add(normalized.first);
+                }
+              });
+            }
+            return created;
+          },
+        ),
+        const SizedBox(height: 12),
         ...List.generate(_days.length, (dayIndex) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -254,6 +287,69 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
           ),
       ],
     );
+  }
+
+  SplitMuscleVolumeSummary _buildMuscleVolumeSummary(
+    List<ExerciseWithLabels> exercises,
+  ) {
+    final exerciseLabelsById = <String, List<String>>{};
+    for (final exercise in exercises) {
+      exerciseLabelsById[exercise.id] = exercise.labels;
+    }
+
+    final dayInputs = <SplitVolumeDayInput>[];
+    for (var dayIndex = 0; dayIndex < _days.length; dayIndex++) {
+      final day = _days[dayIndex];
+      final dayExercises = <SplitVolumeExerciseInput>[];
+
+      for (final planned in day.plannedExercises) {
+        final exerciseId = planned.selectedExerciseId;
+        if (exerciseId == null || exerciseId.isEmpty) {
+          continue;
+        }
+
+        final sets =
+            int.tryParse(planned.targetSetsController.text.trim()) ?? 0;
+        if (sets <= 0) {
+          continue;
+        }
+
+        dayExercises.add(
+          SplitVolumeExerciseInput(exerciseId: exerciseId, targetSets: sets),
+        );
+      }
+
+      dayInputs.add(
+        SplitVolumeDayInput(
+          dayIndex: dayIndex + 1,
+          dayTitle: day.titleController.text.trim(),
+          exercises: dayExercises,
+        ),
+      );
+    }
+
+    return summarizeSplitMuscleVolume(
+      days: dayInputs,
+      exerciseLabelsById: exerciseLabelsById,
+      trackedMuscleLabels: _selectedVolumeControlLabels,
+    );
+  }
+
+  List<String> _buildAvailableControlLabels(
+    List<ExerciseWithLabels> exercises,
+  ) {
+    final labels = <String>{
+      ...defaultSplitVolumeControlLabels,
+      ..._selectedVolumeControlLabels,
+      ..._manuallyCreatedControlLabels,
+    };
+
+    for (final exercise in exercises) {
+      labels.addAll(normalizeSplitVolumeControlLabels(exercise.labels));
+    }
+
+    final sorted = labels.toList()..sort();
+    return sorted;
   }
 
   void _addDay() {
@@ -316,7 +412,9 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
                 ? (isEditing
                       ? 'Saved split changes and set it active.'
                       : 'Saved split and set it active.')
-                : (isEditing ? 'Saved split changes.' : 'Saved split successfully.'),
+                : (isEditing
+                      ? 'Saved split changes.'
+                      : 'Saved split successfully.'),
           ),
         ),
       );

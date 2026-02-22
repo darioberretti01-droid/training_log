@@ -106,35 +106,22 @@ class DriftExerciseRepository implements ExerciseRepository {
           return;
         }
         controller.add(
-          _mergeExercises(
-            standardRows!,
-            userRows!,
-            hiddenStandardExerciseIds!,
-          ),
+          _mergeExercises(standardRows!, userRows!, hiddenStandardExerciseIds!),
         );
       }
 
-      final standardSub = standardStream.listen(
-        (rows) {
-          standardRows = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
-      final userSub = userStream.listen(
-        (rows) {
-          userRows = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
-      final hiddenExerciseSub = hiddenExerciseStream.listen(
-        (rows) {
-          hiddenStandardExerciseIds = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
+      final standardSub = standardStream.listen((rows) {
+        standardRows = rows;
+        emitIfReady();
+      }, onError: controller.addError);
+      final userSub = userStream.listen((rows) {
+        userRows = rows;
+        emitIfReady();
+      }, onError: controller.addError);
+      final hiddenExerciseSub = hiddenExerciseStream.listen((rows) {
+        hiddenStandardExerciseIds = rows;
+        emitIfReady();
+      }, onError: controller.addError);
 
       controller.onCancel = () async {
         await standardSub.cancel();
@@ -156,7 +143,9 @@ class DriftExerciseRepository implements ExerciseRepository {
       List<String>? hiddenLabels;
 
       void emitIfReady() {
-        if (standardLabels == null || userLabels == null || hiddenLabels == null) {
+        if (standardLabels == null ||
+            userLabels == null ||
+            hiddenLabels == null) {
           return;
         }
         controller.add(
@@ -164,27 +153,18 @@ class DriftExerciseRepository implements ExerciseRepository {
         );
       }
 
-      final standardSub = standardStream.listen(
-        (rows) {
-          standardLabels = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
-      final userSub = userStream.listen(
-        (rows) {
-          userLabels = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
-      final hiddenSub = hiddenStream.listen(
-        (rows) {
-          hiddenLabels = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
+      final standardSub = standardStream.listen((rows) {
+        standardLabels = rows;
+        emitIfReady();
+      }, onError: controller.addError);
+      final userSub = userStream.listen((rows) {
+        userLabels = rows;
+        emitIfReady();
+      }, onError: controller.addError);
+      final hiddenSub = hiddenStream.listen((rows) {
+        hiddenLabels = rows;
+        emitIfReady();
+      }, onError: controller.addError);
 
       controller.onCancel = () async {
         await standardSub.cancel();
@@ -206,7 +186,9 @@ class DriftExerciseRepository implements ExerciseRepository {
       List<String>? hiddenLabels;
 
       void emitIfReady() {
-        if (standardLabels == null || userLabels == null || hiddenLabels == null) {
+        if (standardLabels == null ||
+            userLabels == null ||
+            hiddenLabels == null) {
           return;
         }
         controller.add(
@@ -214,27 +196,18 @@ class DriftExerciseRepository implements ExerciseRepository {
         );
       }
 
-      final standardSub = standardStream.listen(
-        (rows) {
-          standardLabels = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
-      final userSub = userStream.listen(
-        (rows) {
-          userLabels = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
-      final hiddenSub = hiddenStream.listen(
-        (rows) {
-          hiddenLabels = rows;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      );
+      final standardSub = standardStream.listen((rows) {
+        standardLabels = rows;
+        emitIfReady();
+      }, onError: controller.addError);
+      final userSub = userStream.listen((rows) {
+        userLabels = rows;
+        emitIfReady();
+      }, onError: controller.addError);
+      final hiddenSub = hiddenStream.listen((rows) {
+        hiddenLabels = rows;
+        emitIfReady();
+      }, onError: controller.addError);
 
       controller.onCancel = () async {
         await standardSub.cancel();
@@ -260,15 +233,6 @@ class DriftExerciseRepository implements ExerciseRepository {
 
   @override
   Future<void> seedIfEmpty() async {
-    final seededExercise =
-        await (_db.select(_db.exercises)
-              ..where((tbl) => tbl.isSeeded.equals(true))
-              ..limit(1))
-            .getSingleOrNull();
-    if (seededExercise != null) {
-      return;
-    }
-
     final now = _now().millisecondsSinceEpoch;
     final uniqueLabels = <String>{};
     for (final exercise in seededExercises) {
@@ -277,35 +241,41 @@ class DriftExerciseRepository implements ExerciseRepository {
 
     await _db.transaction(() async {
       for (final labelName in uniqueLabels.toList()..sort()) {
-        await _db.into(_db.exerciseLabels).insert(
-          ExerciseLabelsCompanion.insert(
-            id: labelIdFromName(labelName),
-            name: labelName,
-          ),
-          mode: InsertMode.insertOrIgnore,
-        );
+        await _db
+            .into(_db.exerciseLabels)
+            .insert(
+              ExerciseLabelsCompanion.insert(
+                id: labelIdFromName(labelName),
+                name: labelName,
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
       }
 
       for (final exercise in seededExercises) {
-        await _db.into(_db.exercises).insert(
-          ExercisesCompanion.insert(
-            id: exercise.id,
-            name: exercise.name,
-            createdAt: now,
-            updatedAt: now,
-            isSeeded: const Value(true),
-          ),
-          mode: InsertMode.insertOrIgnore,
-        );
+        await _db
+            .into(_db.exercises)
+            .insert(
+              ExercisesCompanion.insert(
+                id: exercise.id,
+                name: exercise.name,
+                createdAt: now,
+                updatedAt: now,
+                isSeeded: const Value(true),
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
 
         for (final labelName in exercise.labels) {
-          await _db.into(_db.exerciseLabelLinks).insert(
-            ExerciseLabelLinksCompanion.insert(
-              exerciseId: exercise.id,
-              labelId: labelIdFromName(labelName),
-            ),
-            mode: InsertMode.insertOrIgnore,
-          );
+          await _db
+              .into(_db.exerciseLabelLinks)
+              .insert(
+                ExerciseLabelLinksCompanion.insert(
+                  exerciseId: exercise.id,
+                  labelId: labelIdFromName(labelName),
+                ),
+                mode: InsertMode.insertOrIgnore,
+              );
         }
       }
     });
@@ -329,30 +299,34 @@ class DriftExerciseRepository implements ExerciseRepository {
     final nowMs = _now().millisecondsSinceEpoch;
 
     await _userDb.transaction(() async {
-      await _userDb.into(_userDb.userExercises).insert(
-        UserExercisesCompanion.insert(
-          id: exerciseId,
-          name: normalizedName,
-          isOverride: const Value(false),
-          standardExerciseId: const Value(null),
-          createdAt: nowMs,
-          updatedAt: nowMs,
-        ),
-      );
+      await _userDb
+          .into(_userDb.userExercises)
+          .insert(
+            UserExercisesCompanion.insert(
+              id: exerciseId,
+              name: normalizedName,
+              isOverride: const Value(false),
+              standardExerciseId: const Value(null),
+              createdAt: nowMs,
+              updatedAt: nowMs,
+            ),
+          );
 
       await _replaceUserExerciseLabels(exerciseId, normalizedLabels);
     });
 
-    await _db.into(_db.exercises).insert(
-      ExercisesCompanion.insert(
-        id: exerciseId,
-        name: normalizedName,
-        createdAt: nowMs,
-        updatedAt: nowMs,
-        isSeeded: const Value(false),
-      ),
-      mode: InsertMode.insertOrReplace,
-    );
+    await _db
+        .into(_db.exercises)
+        .insert(
+          ExercisesCompanion.insert(
+            id: exerciseId,
+            name: normalizedName,
+            createdAt: nowMs,
+            updatedAt: nowMs,
+            isSeeded: const Value(false),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
 
     return exerciseId;
   }
@@ -380,23 +354,26 @@ class DriftExerciseRepository implements ExerciseRepository {
       }
 
       await _userDb.transaction(() async {
-        final existingOverride = await (_userDb.select(_userDb.userExercises)
-              ..where((tbl) => tbl.standardExerciseId.equals(exerciseId))
-              ..limit(1))
-            .getSingleOrNull();
+        final existingOverride =
+            await (_userDb.select(_userDb.userExercises)
+                  ..where((tbl) => tbl.standardExerciseId.equals(exerciseId))
+                  ..limit(1))
+                .getSingleOrNull();
 
         final overrideId = existingOverride?.id ?? _uuid.v4();
         if (existingOverride == null) {
-          await _userDb.into(_userDb.userExercises).insert(
-            UserExercisesCompanion.insert(
-              id: overrideId,
-              name: standard.name,
-              isOverride: const Value(true),
-              standardExerciseId: Value(exerciseId),
-              createdAt: nowMs,
-              updatedAt: nowMs,
-            ),
-          );
+          await _userDb
+              .into(_userDb.userExercises)
+              .insert(
+                UserExercisesCompanion.insert(
+                  id: overrideId,
+                  name: standard.name,
+                  isOverride: const Value(true),
+                  standardExerciseId: Value(exerciseId),
+                  createdAt: nowMs,
+                  updatedAt: nowMs,
+                ),
+              );
         } else {
           await (_userDb.update(_userDb.userExercises)
                 ..where((tbl) => tbl.id.equals(existingOverride.id)))
@@ -408,10 +385,11 @@ class DriftExerciseRepository implements ExerciseRepository {
       return;
     }
 
-    final customExercise = await (_userDb.select(_userDb.userExercises)
-          ..where((tbl) => tbl.id.equals(exerciseId))
-          ..limit(1))
-        .getSingleOrNull();
+    final customExercise =
+        await (_userDb.select(_userDb.userExercises)
+              ..where((tbl) => tbl.id.equals(exerciseId))
+              ..limit(1))
+            .getSingleOrNull();
     if (customExercise == null || customExercise.isOverride) {
       throw ArgumentError('Exercise not found: $exerciseId');
     }
@@ -426,17 +404,20 @@ class DriftExerciseRepository implements ExerciseRepository {
 
   @override
   Future<void> restoreStandardLabels(String standardExerciseId) async {
-    final overrideExercise = await (_userDb.select(_userDb.userExercises)
-          ..where((tbl) => tbl.standardExerciseId.equals(standardExerciseId))
-          ..limit(1))
-        .getSingleOrNull();
+    final overrideExercise =
+        await (_userDb.select(_userDb.userExercises)
+              ..where(
+                (tbl) => tbl.standardExerciseId.equals(standardExerciseId),
+              )
+              ..limit(1))
+            .getSingleOrNull();
     if (overrideExercise == null) {
       return;
     }
 
-    await (_userDb.delete(_userDb.userExercises)
-          ..where((tbl) => tbl.id.equals(overrideExercise.id)))
-        .go();
+    await (_userDb.delete(
+      _userDb.userExercises,
+    )..where((tbl) => tbl.id.equals(overrideExercise.id))).go();
   }
 
   @override
@@ -449,21 +430,24 @@ class DriftExerciseRepository implements ExerciseRepository {
       return false;
     }
 
-    final existing = await (_userDb.select(_userDb.userExerciseLabels)
-          ..where((tbl) => tbl.name.equals(normalized))
-          ..limit(1))
-        .getSingleOrNull();
+    final existing =
+        await (_userDb.select(_userDb.userExerciseLabels)
+              ..where((tbl) => tbl.name.equals(normalized))
+              ..limit(1))
+            .getSingleOrNull();
     if (existing != null) {
       return false;
     }
 
-    await _userDb.into(_userDb.userExerciseLabels).insert(
-      UserExerciseLabelsCompanion.insert(
-        id: labelIdFromName(normalized),
-        name: normalized,
-      ),
-      mode: InsertMode.insertOrIgnore,
-    );
+    await _userDb
+        .into(_userDb.userExerciseLabels)
+        .insert(
+          UserExerciseLabelsCompanion.insert(
+            id: labelIdFromName(normalized),
+            name: normalized,
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
     return true;
   }
 
@@ -474,27 +458,30 @@ class DriftExerciseRepository implements ExerciseRepository {
       return false;
     }
 
-    final existing = await (_userDb.select(_userDb.hiddenStandardLabels)
-          ..where((tbl) => tbl.labelName.equals(normalized))
-          ..limit(1))
-        .getSingleOrNull();
+    final existing =
+        await (_userDb.select(_userDb.hiddenStandardLabels)
+              ..where((tbl) => tbl.labelName.equals(normalized))
+              ..limit(1))
+            .getSingleOrNull();
     if (existing != null) {
       return false;
     }
 
-    await _userDb.into(_userDb.hiddenStandardLabels).insert(
-      HiddenStandardLabelsCompanion.insert(labelName: normalized),
-      mode: InsertMode.insertOrIgnore,
-    );
+    await _userDb
+        .into(_userDb.hiddenStandardLabels)
+        .insert(
+          HiddenStandardLabelsCompanion.insert(labelName: normalized),
+          mode: InsertMode.insertOrIgnore,
+        );
     return true;
   }
 
   @override
   Future<bool> unhideStandardLabel(String label) async {
     final normalized = _normalizeLabel(label);
-    final deleted = await (_userDb.delete(_userDb.hiddenStandardLabels)
-          ..where((tbl) => tbl.labelName.equals(normalized)))
-        .go();
+    final deleted = await (_userDb.delete(
+      _userDb.hiddenStandardLabels,
+    )..where((tbl) => tbl.labelName.equals(normalized))).go();
     return deleted > 0;
   }
 
@@ -505,25 +492,26 @@ class DriftExerciseRepository implements ExerciseRepository {
       return null;
     }
 
-    final labelRow = await (_userDb.select(_userDb.userExerciseLabels)
-          ..where((tbl) => tbl.name.equals(normalized))
-          ..limit(1))
-        .getSingleOrNull();
+    final labelRow =
+        await (_userDb.select(_userDb.userExerciseLabels)
+              ..where((tbl) => tbl.name.equals(normalized))
+              ..limit(1))
+            .getSingleOrNull();
     if (labelRow == null) {
       return null;
     }
 
-    final linkRows = await (_userDb.select(_userDb.userExerciseLabelLinks)
-          ..where((tbl) => tbl.labelId.equals(labelRow.id)))
-        .get();
+    final linkRows = await (_userDb.select(
+      _userDb.userExerciseLabelLinks,
+    )..where((tbl) => tbl.labelId.equals(labelRow.id))).get();
     final linkedExerciseIds = linkRows
         .map((link) => link.exerciseId)
         .toSet()
         .toList(growable: false);
 
-    await (_userDb.delete(_userDb.userExerciseLabels)
-          ..where((tbl) => tbl.id.equals(labelRow.id)))
-        .go();
+    await (_userDb.delete(
+      _userDb.userExerciseLabels,
+    )..where((tbl) => tbl.id.equals(labelRow.id))).go();
 
     return DeletedCustomLabelSnapshot(
       labelName: normalized,
@@ -532,126 +520,143 @@ class DriftExerciseRepository implements ExerciseRepository {
   }
 
   @override
-  Future<void> restoreDeletedCustomLabel(DeletedCustomLabelSnapshot snapshot) async {
+  Future<void> restoreDeletedCustomLabel(
+    DeletedCustomLabelSnapshot snapshot,
+  ) async {
     final normalized = _normalizeLabel(snapshot.labelName);
     if (normalized.isEmpty || _standardSeedLabelSet.contains(normalized)) {
       return;
     }
 
     final labelId = labelIdFromName(normalized);
-    await _userDb.into(_userDb.userExerciseLabels).insert(
-      UserExerciseLabelsCompanion.insert(id: labelId, name: normalized),
-      mode: InsertMode.insertOrIgnore,
-    );
+    await _userDb
+        .into(_userDb.userExerciseLabels)
+        .insert(
+          UserExerciseLabelsCompanion.insert(id: labelId, name: normalized),
+          mode: InsertMode.insertOrIgnore,
+        );
 
     for (final exerciseId in snapshot.linkedExerciseIds) {
-      final exists = await (_userDb.select(_userDb.userExercises)
-            ..where((tbl) => tbl.id.equals(exerciseId))
-            ..limit(1))
-          .getSingleOrNull();
+      final exists =
+          await (_userDb.select(_userDb.userExercises)
+                ..where((tbl) => tbl.id.equals(exerciseId))
+                ..limit(1))
+              .getSingleOrNull();
       if (exists == null) {
         continue;
       }
-      await _userDb.into(_userDb.userExerciseLabelLinks).insert(
-        UserExerciseLabelLinksCompanion.insert(
-          exerciseId: exerciseId,
-          labelId: labelId,
-        ),
-        mode: InsertMode.insertOrIgnore,
-      );
+      await _userDb
+          .into(_userDb.userExerciseLabelLinks)
+          .insert(
+            UserExerciseLabelLinksCompanion.insert(
+              exerciseId: exerciseId,
+              labelId: labelId,
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
     }
   }
 
   @override
   Future<bool> hideStandardExercise(String standardExerciseId) async {
-    final standardExists = await (_db.select(_db.exercises)
-          ..where(
-            (tbl) =>
-                tbl.id.equals(standardExerciseId) & tbl.isSeeded.equals(true),
-          )
-          ..limit(1))
-        .getSingleOrNull();
+    final standardExists =
+        await (_db.select(_db.exercises)
+              ..where(
+                (tbl) =>
+                    tbl.id.equals(standardExerciseId) &
+                    tbl.isSeeded.equals(true),
+              )
+              ..limit(1))
+            .getSingleOrNull();
     if (standardExists == null) {
       return false;
     }
 
-    final existing = await (_userDb.select(_userDb.hiddenStandardExercises)
-          ..where((tbl) => tbl.standardExerciseId.equals(standardExerciseId))
-          ..limit(1))
-        .getSingleOrNull();
+    final existing =
+        await (_userDb.select(_userDb.hiddenStandardExercises)
+              ..where(
+                (tbl) => tbl.standardExerciseId.equals(standardExerciseId),
+              )
+              ..limit(1))
+            .getSingleOrNull();
     if (existing != null) {
       return false;
     }
 
-    await _userDb.into(_userDb.hiddenStandardExercises).insert(
-      HiddenStandardExercisesCompanion.insert(
-        standardExerciseId: standardExerciseId,
-      ),
-      mode: InsertMode.insertOrIgnore,
-    );
+    await _userDb
+        .into(_userDb.hiddenStandardExercises)
+        .insert(
+          HiddenStandardExercisesCompanion.insert(
+            standardExerciseId: standardExerciseId,
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
     return true;
   }
 
   @override
   Future<bool> unhideStandardExercise(String standardExerciseId) async {
-    final deleted = await (_userDb.delete(_userDb.hiddenStandardExercises)
-          ..where((tbl) => tbl.standardExerciseId.equals(standardExerciseId)))
-        .go();
+    final deleted = await (_userDb.delete(
+      _userDb.hiddenStandardExercises,
+    )..where((tbl) => tbl.standardExerciseId.equals(standardExerciseId))).go();
     return deleted > 0;
   }
 
   @override
   Future<bool> deleteCustomExercise(String exerciseId) async {
-    final customExercise = await (_userDb.select(_userDb.userExercises)
-          ..where((tbl) => tbl.id.equals(exerciseId))
-          ..limit(1))
-        .getSingleOrNull();
+    final customExercise =
+        await (_userDb.select(_userDb.userExercises)
+              ..where((tbl) => tbl.id.equals(exerciseId))
+              ..limit(1))
+            .getSingleOrNull();
     if (customExercise == null || customExercise.isOverride) {
       return false;
     }
 
-    final deleted = await (_userDb.delete(_userDb.userExercises)
-          ..where((tbl) => tbl.id.equals(exerciseId)))
-        .go();
+    final deleted = await (_userDb.delete(
+      _userDb.userExercises,
+    )..where((tbl) => tbl.id.equals(exerciseId))).go();
     return deleted > 0;
   }
 
   Stream<List<_StandardExercise>> _watchStandardExercises() {
-    final query = _db.select(_db.exercises).join([
-      leftOuterJoin(
-        _db.exerciseLabelLinks,
-        _db.exerciseLabelLinks.exerciseId.equalsExp(_db.exercises.id),
-      ),
-      leftOuterJoin(
-        _db.exerciseLabels,
-        _db.exerciseLabels.id.equalsExp(_db.exerciseLabelLinks.labelId),
-      ),
-    ])
-      ..where(_db.exercises.isSeeded.equals(true))
-      ..orderBy([
-        OrderingTerm(expression: _db.exercises.name),
-        OrderingTerm(expression: _db.exerciseLabels.name),
-      ]);
+    final query =
+        _db.select(_db.exercises).join([
+            leftOuterJoin(
+              _db.exerciseLabelLinks,
+              _db.exerciseLabelLinks.exerciseId.equalsExp(_db.exercises.id),
+            ),
+            leftOuterJoin(
+              _db.exerciseLabels,
+              _db.exerciseLabels.id.equalsExp(_db.exerciseLabelLinks.labelId),
+            ),
+          ])
+          ..where(_db.exercises.isSeeded.equals(true))
+          ..orderBy([
+            OrderingTerm(expression: _db.exercises.name),
+            OrderingTerm(expression: _db.exerciseLabels.name),
+          ]);
 
     return query.watch().map(_mapStandardRows);
   }
 
   Future<List<_StandardExercise>> _getStandardExercises() {
-    final query = _db.select(_db.exercises).join([
-      leftOuterJoin(
-        _db.exerciseLabelLinks,
-        _db.exerciseLabelLinks.exerciseId.equalsExp(_db.exercises.id),
-      ),
-      leftOuterJoin(
-        _db.exerciseLabels,
-        _db.exerciseLabels.id.equalsExp(_db.exerciseLabelLinks.labelId),
-      ),
-    ])
-      ..where(_db.exercises.isSeeded.equals(true))
-      ..orderBy([
-        OrderingTerm(expression: _db.exercises.name),
-        OrderingTerm(expression: _db.exerciseLabels.name),
-      ]);
+    final query =
+        _db.select(_db.exercises).join([
+            leftOuterJoin(
+              _db.exerciseLabelLinks,
+              _db.exerciseLabelLinks.exerciseId.equalsExp(_db.exercises.id),
+            ),
+            leftOuterJoin(
+              _db.exerciseLabels,
+              _db.exerciseLabels.id.equalsExp(_db.exerciseLabelLinks.labelId),
+            ),
+          ])
+          ..where(_db.exercises.isSeeded.equals(true))
+          ..orderBy([
+            OrderingTerm(expression: _db.exercises.name),
+            OrderingTerm(expression: _db.exerciseLabels.name),
+          ]);
 
     return query.get().then(_mapStandardRows);
   }
@@ -662,47 +667,47 @@ class DriftExerciseRepository implements ExerciseRepository {
   }
 
   Stream<List<_UserExercise>> _watchUserExercises() {
-    final query = _userDb.select(_userDb.userExercises).join([
-      leftOuterJoin(
-        _userDb.userExerciseLabelLinks,
-        _userDb.userExerciseLabelLinks.exerciseId.equalsExp(
-          _userDb.userExercises.id,
-        ),
-      ),
-      leftOuterJoin(
-        _userDb.userExerciseLabels,
-        _userDb.userExerciseLabels.id.equalsExp(
-          _userDb.userExerciseLabelLinks.labelId,
-        ),
-      ),
-    ])
-      ..orderBy([
-        OrderingTerm(expression: _userDb.userExercises.name),
-        OrderingTerm(expression: _userDb.userExerciseLabels.name),
-      ]);
+    final query =
+        _userDb.select(_userDb.userExercises).join([
+          leftOuterJoin(
+            _userDb.userExerciseLabelLinks,
+            _userDb.userExerciseLabelLinks.exerciseId.equalsExp(
+              _userDb.userExercises.id,
+            ),
+          ),
+          leftOuterJoin(
+            _userDb.userExerciseLabels,
+            _userDb.userExerciseLabels.id.equalsExp(
+              _userDb.userExerciseLabelLinks.labelId,
+            ),
+          ),
+        ])..orderBy([
+          OrderingTerm(expression: _userDb.userExercises.name),
+          OrderingTerm(expression: _userDb.userExerciseLabels.name),
+        ]);
 
     return query.watch().map(_mapUserRows);
   }
 
   Future<List<_UserExercise>> _getUserExercises() {
-    final query = _userDb.select(_userDb.userExercises).join([
-      leftOuterJoin(
-        _userDb.userExerciseLabelLinks,
-        _userDb.userExerciseLabelLinks.exerciseId.equalsExp(
-          _userDb.userExercises.id,
-        ),
-      ),
-      leftOuterJoin(
-        _userDb.userExerciseLabels,
-        _userDb.userExerciseLabels.id.equalsExp(
-          _userDb.userExerciseLabelLinks.labelId,
-        ),
-      ),
-    ])
-      ..orderBy([
-        OrderingTerm(expression: _userDb.userExercises.name),
-        OrderingTerm(expression: _userDb.userExerciseLabels.name),
-      ]);
+    final query =
+        _userDb.select(_userDb.userExercises).join([
+          leftOuterJoin(
+            _userDb.userExerciseLabelLinks,
+            _userDb.userExerciseLabelLinks.exerciseId.equalsExp(
+              _userDb.userExercises.id,
+            ),
+          ),
+          leftOuterJoin(
+            _userDb.userExerciseLabels,
+            _userDb.userExerciseLabels.id.equalsExp(
+              _userDb.userExerciseLabelLinks.labelId,
+            ),
+          ),
+        ])..orderBy([
+          OrderingTerm(expression: _userDb.userExercises.name),
+          OrderingTerm(expression: _userDb.userExerciseLabels.name),
+        ]);
 
     return query.get().then(_mapUserRows);
   }
@@ -851,7 +856,8 @@ class DriftExerciseRepository implements ExerciseRepository {
 
       final entry = grouped.putIfAbsent(
         exercise.id,
-        () => _StandardExerciseAccumulator(id: exercise.id, name: exercise.name),
+        () =>
+            _StandardExerciseAccumulator(id: exercise.id, name: exercise.name),
       );
 
       if (label != null && !entry.labels.contains(label.name)) {
@@ -913,23 +919,27 @@ class DriftExerciseRepository implements ExerciseRepository {
     String exerciseId,
     List<String> labels,
   ) async {
-    await (_userDb.delete(_userDb.userExerciseLabelLinks)
-          ..where((tbl) => tbl.exerciseId.equals(exerciseId)))
-        .go();
+    await (_userDb.delete(
+      _userDb.userExerciseLabelLinks,
+    )..where((tbl) => tbl.exerciseId.equals(exerciseId))).go();
 
     for (final labelName in labels) {
       final labelId = labelIdFromName(labelName);
-      await _userDb.into(_userDb.userExerciseLabels).insert(
-        UserExerciseLabelsCompanion.insert(id: labelId, name: labelName),
-        mode: InsertMode.insertOrIgnore,
-      );
-      await _userDb.into(_userDb.userExerciseLabelLinks).insert(
-        UserExerciseLabelLinksCompanion.insert(
-          exerciseId: exerciseId,
-          labelId: labelId,
-        ),
-        mode: InsertMode.insertOrIgnore,
-      );
+      await _userDb
+          .into(_userDb.userExerciseLabels)
+          .insert(
+            UserExerciseLabelsCompanion.insert(id: labelId, name: labelName),
+            mode: InsertMode.insertOrIgnore,
+          );
+      await _userDb
+          .into(_userDb.userExerciseLabelLinks)
+          .insert(
+            UserExerciseLabelLinksCompanion.insert(
+              exerciseId: exerciseId,
+              labelId: labelId,
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
     }
   }
 
@@ -1002,10 +1012,7 @@ class _StandardExercise {
 }
 
 class _StandardExerciseAccumulator {
-  _StandardExerciseAccumulator({
-    required this.id,
-    required this.name,
-  });
+  _StandardExerciseAccumulator({required this.id, required this.name});
 
   final String id;
   final String name;
