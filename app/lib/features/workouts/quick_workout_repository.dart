@@ -4,12 +4,39 @@ import 'package:uuid/uuid.dart';
 import '../../core/db/app_database.dart';
 import '../../core/models/logged_set_input.dart';
 
+class WorkoutSessionMode {
+  static const String quick = 'quick';
+  static const String splitDay = 'split_day';
+  static const String free = 'free';
+
+  static bool isSupported(String mode) {
+    return mode == quick || mode == splitDay || mode == free;
+  }
+}
+
+class WorkoutExerciseLogInput {
+  const WorkoutExerciseLogInput({required this.exerciseId, required this.sets});
+
+  final String exerciseId;
+  final List<LoggedSetInput> sets;
+}
+
 abstract class QuickWorkoutRepository {
   Future<String> saveQuickWorkout({
     required String exerciseId,
     required DateTime startedAt,
     required DateTime endedAt,
     required List<LoggedSetInput> sets,
+  });
+
+  Future<String> saveWorkoutSession({
+    required String mode,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required List<WorkoutExerciseLogInput> exercises,
+    String? splitId,
+    int? dayIndex,
+    String? sessionName,
   });
 
   Future<PerformedSet?> getBestSetForExercise(String exerciseId);
@@ -35,6 +62,13 @@ abstract class QuickWorkoutRepository {
 
   Future<List<HomeSessionOverviewEntry>> getRecentSessionsOverview({
     int sessionLimit = 8,
+    String? sessionType,
+    String? splitId,
+  });
+
+  Future<HomeSessionOverviewEntry?> getLastSession({
+    String? sessionType,
+    String? splitId,
   });
 }
 
@@ -53,11 +87,17 @@ class HomeSessionOverviewEntry {
     required this.session,
     required this.exercises,
     required this.totalSets,
+    this.sessionName,
+    this.splitId,
+    this.dayIndex,
   });
 
   final WorkoutSession session;
   final List<HomeSessionExerciseSummary> exercises;
   final int totalSets;
+  final String? sessionName;
+  final String? splitId;
+  final int? dayIndex;
 }
 
 class HomeSessionExerciseSummary {
@@ -86,28 +126,71 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
     required DateTime endedAt,
     required List<LoggedSetInput> sets,
   }) async {
-    if (sets.isEmpty) {
-      throw ArgumentError('At least one set is required.');
+    return saveWorkoutSession(
+      mode: WorkoutSessionMode.quick,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      sessionName: null,
+      exercises: [WorkoutExerciseLogInput(exerciseId: exerciseId, sets: sets)],
+    );
+  }
+
+  @override
+  Future<String> saveWorkoutSession({
+    required String mode,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required List<WorkoutExerciseLogInput> exercises,
+    String? splitId,
+    int? dayIndex,
+    String? sessionName,
+  }) async {
+    final normalizedMode = mode.trim();
+    if (!WorkoutSessionMode.isSupported(normalizedMode)) {
+      throw ArgumentError('Unsupported workout session mode: $mode');
+    }
+    if (endedAt.isBefore(startedAt)) {
+      throw ArgumentError('End time cannot be before start time.');
+    }
+    if (normalizedMode == WorkoutSessionMode.splitDay) {
+      if (splitId == null || splitId.trim().isEmpty) {
+        throw ArgumentError('splitId is required for split_day mode.');
+      }
+      if (dayIndex == null || dayIndex <= 0) {
+        throw ArgumentError(
+          'dayIndex must be greater than zero for split_day mode.',
+        );
+      }
     }
 
-    for (final set in sets) {
-      if (set.reps <= 0) {
-        throw ArgumentError('Reps must be greater than zero.');
+    final normalizedExercises = <WorkoutExerciseLogInput>[];
+    for (final exercise in exercises) {
+      final normalizedExerciseId = exercise.exerciseId.trim();
+      if (normalizedExerciseId.isEmpty) {
+        throw ArgumentError('exerciseId cannot be empty.');
       }
-      if (set.weightKg <= 0) {
-        throw ArgumentError('Weight must be greater than zero.');
+      if (exercise.sets.isEmpty) {
+        continue;
       }
-      if (set.restSeconds != null && set.restSeconds! < 0) {
-        throw ArgumentError('Rest seconds cannot be negative.');
+      for (final set in exercise.sets) {
+        _validateSet(set);
       }
-      if (set.rpe != null && (set.rpe! < 0 || set.rpe! > 10)) {
-        throw ArgumentError('RPE must be between 0 and 10.');
-      }
+      normalizedExercises.add(
+        WorkoutExerciseLogInput(
+          exerciseId: normalizedExerciseId,
+          sets: List.unmodifiable(exercise.sets),
+        ),
+      );
+    }
+    if (normalizedExercises.isEmpty) {
+      throw ArgumentError('At least one set is required.');
     }
 
     final sessionId = _uuid.v4();
     final startedAtMs = startedAt.millisecondsSinceEpoch;
     final endedAtMs = endedAt.millisecondsSinceEpoch;
+    final normalizedSessionName = _normalizeOptionalString(sessionName);
+    final normalizedSplitId = _normalizeOptionalString(splitId);
 
     await _db.transaction(() async {
       await _db
@@ -115,29 +198,34 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
           .insert(
             WorkoutSessionsCompanion.insert(
               id: sessionId,
-              sessionType: 'quick',
+              sessionType: normalizedMode,
               startedAt: startedAtMs,
               endedAt: endedAtMs,
+              splitId: Value(normalizedSplitId),
+              dayIndex: Value(dayIndex),
+              sessionName: Value(normalizedSessionName),
             ),
           );
 
-      for (var index = 0; index < sets.length; index++) {
-        final set = sets[index];
-        await _db
-            .into(_db.performedSets)
-            .insert(
-              PerformedSetsCompanion.insert(
-                id: _uuid.v4(),
-                sessionId: sessionId,
-                exerciseId: exerciseId,
-                setIndex: index + 1,
-                reps: set.reps,
-                weightKg: set.weightKg,
-                performedAt: endedAtMs,
-                restSeconds: Value(set.restSeconds),
-                rpe: Value(set.rpe),
-              ),
-            );
+      for (final exercise in normalizedExercises) {
+        for (var index = 0; index < exercise.sets.length; index++) {
+          final set = exercise.sets[index];
+          await _db
+              .into(_db.performedSets)
+              .insert(
+                PerformedSetsCompanion.insert(
+                  id: _uuid.v4(),
+                  sessionId: sessionId,
+                  exerciseId: exercise.exerciseId,
+                  setIndex: index + 1,
+                  reps: set.reps,
+                  weightKg: set.weightKg,
+                  performedAt: endedAtMs,
+                  restSeconds: Value(set.restSeconds),
+                  rpe: Value(set.rpe),
+                ),
+              );
+        }
       }
     });
 
@@ -208,7 +296,9 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
     String exerciseId, {
     int sessionLimit = 12,
   }) {
-    return getRecentSessionsForExercises([exerciseId], sessionLimit: sessionLimit);
+    return getRecentSessionsForExercises([
+      exerciseId,
+    ], sessionLimit: sessionLimit);
   }
 
   @override
@@ -267,25 +357,37 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
   @override
   Future<List<HomeSessionOverviewEntry>> getRecentSessionsOverview({
     int sessionLimit = 8,
+    String? sessionType,
+    String? splitId,
   }) async {
-    final query =
-        _db.select(_db.performedSets).join([
-            innerJoin(
-              _db.workoutSessions,
-              _db.workoutSessions.id.equalsExp(_db.performedSets.sessionId),
-            ),
-            innerJoin(
-              _db.exercises,
-              _db.exercises.id.equalsExp(_db.performedSets.exerciseId),
-            ),
-          ])
-          ..where(_db.workoutSessions.sessionType.equals('quick'))
-          ..orderBy([
-            OrderingTerm.desc(_db.workoutSessions.startedAt),
-            OrderingTerm.asc(_db.performedSets.setIndex),
-            OrderingTerm.asc(_db.exercises.name),
-            OrderingTerm.desc(_db.workoutSessions.id),
-          ]);
+    final normalizedSessionType = _normalizeOptionalString(sessionType);
+    final normalizedSplitId = _normalizeOptionalString(splitId);
+
+    final query = _db.select(_db.performedSets).join([
+      innerJoin(
+        _db.workoutSessions,
+        _db.workoutSessions.id.equalsExp(_db.performedSets.sessionId),
+      ),
+      innerJoin(
+        _db.exercises,
+        _db.exercises.id.equalsExp(_db.performedSets.exerciseId),
+      ),
+    ]);
+
+    final where = _buildOverviewFilter(
+      sessionType: normalizedSessionType,
+      splitId: normalizedSplitId,
+    );
+    if (where != null) {
+      query.where(where);
+    }
+
+    query.orderBy([
+      OrderingTerm.desc(_db.workoutSessions.startedAt),
+      OrderingTerm.asc(_db.performedSets.setIndex),
+      OrderingTerm.asc(_db.exercises.name),
+      OrderingTerm.desc(_db.workoutSessions.id),
+    ]);
 
     final rows = await query.get();
     final grouped = <String, _HomeSessionAccumulator>{};
@@ -341,9 +443,71 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
             session: entry.session,
             exercises: List.unmodifiable(exercises),
             totalSets: entry.totalSets,
+            sessionName: entry.session.sessionName,
+            splitId: entry.session.splitId,
+            dayIndex: entry.session.dayIndex,
           );
         })
         .toList(growable: false);
+  }
+
+  @override
+  Future<HomeSessionOverviewEntry?> getLastSession({
+    String? sessionType,
+    String? splitId,
+  }) async {
+    final sessions = await getRecentSessionsOverview(
+      sessionLimit: 1,
+      sessionType: sessionType,
+      splitId: splitId,
+    );
+    if (sessions.isEmpty) {
+      return null;
+    }
+    return sessions.first;
+  }
+
+  void _validateSet(LoggedSetInput set) {
+    if (set.reps <= 0) {
+      throw ArgumentError('Reps must be greater than zero.');
+    }
+    if (set.weightKg <= 0) {
+      throw ArgumentError('Weight must be greater than zero.');
+    }
+    if (set.restSeconds != null && set.restSeconds! < 0) {
+      throw ArgumentError('Rest seconds cannot be negative.');
+    }
+    if (set.rpe != null && (set.rpe! < 0 || set.rpe! > 10)) {
+      throw ArgumentError('RPE must be between 0 and 10.');
+    }
+  }
+
+  String? _normalizeOptionalString(String? value) {
+    if (value == null) {
+      return null;
+    }
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  Expression<bool>? _buildOverviewFilter({
+    required String? sessionType,
+    required String? splitId,
+  }) {
+    Expression<bool>? where;
+
+    if (sessionType != null) {
+      where = _db.workoutSessions.sessionType.equals(sessionType);
+    }
+    if (splitId != null) {
+      final splitIdFilter = _db.workoutSessions.splitId.equals(splitId);
+      where = where == null ? splitIdFilter : where & splitIdFilter;
+    }
+
+    return where;
   }
 
   Expression<bool> _exerciseIdFilter(

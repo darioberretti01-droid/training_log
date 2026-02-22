@@ -24,7 +24,7 @@ void main() {
     }
   });
 
-  test('migrates v1 database to v2 and preserves phase 1 data', () async {
+  test('migrates v1 database to v3 and preserves phase 1 data', () async {
     final v1Executor = NativeDatabase(dbFile);
     final v1Db = AppDatabase(v1Executor);
 
@@ -109,6 +109,12 @@ void main() {
       FROM sqlite_master
       WHERE type = 'table' AND name IN ('splits', 'day_plans', 'planned_exercises');
     ''').get();
+    final splitColumnRows = await upgradedDb
+        .customSelect("PRAGMA table_info('splits');")
+        .get();
+    final sessionColumnRows = await upgradedDb
+        .customSelect("PRAGMA table_info('workout_sessions');")
+        .get();
     final exercisesCountRow = await upgradedDb
         .customSelect('SELECT COUNT(*) AS c FROM exercises;')
         .getSingle();
@@ -116,8 +122,26 @@ void main() {
         .customSelect('SELECT COUNT(*) AS c FROM performed_sets;')
         .getSingle();
 
-    expect(versionRow.read<int>('user_version'), 2);
+    expect(versionRow.read<int>('user_version'), 3);
     expect(tableRows, hasLength(3));
+    expect(
+      splitColumnRows.any((row) => row.read<String>('name') == 'schedule_mode'),
+      isTrue,
+    );
+    expect(
+      sessionColumnRows.any((row) => row.read<String>('name') == 'split_id'),
+      isTrue,
+    );
+    expect(
+      sessionColumnRows.any((row) => row.read<String>('name') == 'day_index'),
+      isTrue,
+    );
+    expect(
+      sessionColumnRows.any(
+        (row) => row.read<String>('name') == 'session_name',
+      ),
+      isTrue,
+    );
     expect(exercisesCountRow.read<int>('c'), 1);
     expect(setsCountRow.read<int>('c'), 1);
 

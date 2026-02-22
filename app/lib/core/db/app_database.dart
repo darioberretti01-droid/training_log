@@ -48,6 +48,12 @@ class WorkoutSessions extends Table {
 
   TextColumn get sessionType => text().named('session_type')();
 
+  TextColumn get splitId => text().named('split_id').nullable()();
+
+  IntColumn get dayIndex => integer().named('day_index').nullable()();
+
+  TextColumn get sessionName => text().named('session_name').nullable()();
+
   IntColumn get startedAt => integer().named('started_at')();
 
   IntColumn get endedAt => integer().named('ended_at')();
@@ -85,6 +91,9 @@ class Splits extends Table {
   TextColumn get id => text()();
 
   TextColumn get name => text()();
+
+  TextColumn get scheduleMode =>
+      text().named('schedule_mode').withDefault(const Constant('sequence'))();
 
   BoolColumn get isActive =>
       boolean().named('is_active').withDefault(const Constant(false))();
@@ -175,7 +184,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -185,6 +194,14 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(splits);
         await m.createTable(dayPlans);
         await m.createTable(plannedExercises);
+      }
+      if (from < 3) {
+        await m.addColumn(workoutSessions, workoutSessions.splitId);
+        await m.addColumn(workoutSessions, workoutSessions.dayIndex);
+        await m.addColumn(workoutSessions, workoutSessions.sessionName);
+        if (from >= 2) {
+          await m.addColumn(splits, splits.scheduleMode);
+        }
       }
     },
     beforeOpen: (details) async {

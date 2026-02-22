@@ -82,12 +82,14 @@ class _FakeQuickWorkoutRepository implements QuickWorkoutRepository {
   Future<PerformedSet?> getBestSetForExercise(String exerciseId) async => null;
 
   @override
-  Future<PerformedSet?> getBestSetForExercises(List<String> exerciseIds) async =>
-      null;
+  Future<PerformedSet?> getBestSetForExercises(
+    List<String> exerciseIds,
+  ) async => null;
 
   @override
-  Future<PerformedSet?> getLastSetForExercises(List<String> exerciseIds) async =>
-      null;
+  Future<PerformedSet?> getLastSetForExercises(
+    List<String> exerciseIds,
+  ) async => null;
 
   @override
   Future<List<PerformedSet>> getRecentSetsForExercise(
@@ -110,7 +112,15 @@ class _FakeQuickWorkoutRepository implements QuickWorkoutRepository {
   @override
   Future<List<HomeSessionOverviewEntry>> getRecentSessionsOverview({
     int sessionLimit = 8,
+    String? sessionType,
+    String? splitId,
   }) async => const [];
+
+  @override
+  Future<HomeSessionOverviewEntry?> getLastSession({
+    String? sessionType,
+    String? splitId,
+  }) async => null;
 
   @override
   Future<String> saveQuickWorkout({
@@ -121,6 +131,23 @@ class _FakeQuickWorkoutRepository implements QuickWorkoutRepository {
   }) async {
     saveCalls += 1;
     lastSavedSets = sets;
+    return 'session_1';
+  }
+
+  @override
+  Future<String> saveWorkoutSession({
+    required String mode,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required List<WorkoutExerciseLogInput> exercises,
+    String? splitId,
+    int? dayIndex,
+    String? sessionName,
+  }) async {
+    saveCalls += 1;
+    if (exercises.isNotEmpty) {
+      lastSavedSets = exercises.first.sets;
+    }
     return 'session_1';
   }
 }

@@ -13,11 +13,18 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (count, error) => null,
         overrides: [
           seedDataProvider.overrideWith((ref) async {}),
           exercisesProvider.overrideWith((ref) => Stream.value(const [])),
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
         ],
         child: const TrainingLogApp(),
       ),
@@ -38,6 +45,7 @@ void main() {
   testWidgets('splits add button opens split builder', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (count, error) => null,
         overrides: [
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
@@ -50,6 +58,12 @@ void main() {
                 labels: ['push', 'chest'],
               ),
             ]),
+          ),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
           ),
         ],
         child: const TrainingLogApp(),
@@ -68,11 +82,18 @@ void main() {
   testWidgets('back from splits root returns to home', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (count, error) => null,
         overrides: [
           seedDataProvider.overrideWith((ref) async {}),
           exercisesProvider.overrideWith((ref) => Stream.value(const [])),
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
         ],
         child: const TrainingLogApp(),
       ),
@@ -98,11 +119,18 @@ void main() {
   testWidgets('back from other root returns to home', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (count, error) => null,
         overrides: [
           seedDataProvider.overrideWith((ref) async {}),
           exercisesProvider.overrideWith((ref) => Stream.value(const [])),
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
         ],
         child: const TrainingLogApp(),
       ),
@@ -156,12 +184,19 @@ void main() {
       );
     await tester.pumpWidget(
       ProviderScope(
+        retry: (count, error) => null,
         overrides: [
           seedDataProvider.overrideWith((ref) async {}),
           exercisesProvider.overrideWith((ref) => Stream.value(const [])),
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           splitRepositoryProvider.overrideWithValue(repository),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
         ],
         child: const TrainingLogApp(),
       ),

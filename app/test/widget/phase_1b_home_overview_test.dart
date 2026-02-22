@@ -40,12 +40,8 @@ void main() {
     await _pumpHome(tester, recentSessionsLoader: (_) async => sessions);
 
     expect(find.text('Recent sessions'), findsOneWidget);
-    expect(find.text('Session 2026-01-10 07:00'), findsOneWidget);
-    expect(find.text('45 min | 5 sets'), findsOneWidget);
-    expect(
-      find.text('Exercises: Bench Press, Barbell Row (+1 more)'),
-      findsOneWidget,
-    );
+    expect(find.text('Quick workout - Jan 10'), findsOneWidget);
+    expect(find.text('5 sets'), findsOneWidget);
     expect(find.byKey(const Key('home_log_current_split')), findsOneWidget);
   });
 
@@ -92,7 +88,10 @@ void main() {
     final router = GoRouter(
       routes: [
         GoRoute(path: '/', redirect: (context, state) => '/home'),
-        GoRoute(path: '/home', builder: (context, state) => const HomeTabContent()),
+        GoRoute(
+          path: '/home',
+          builder: (context, state) => const HomeTabContent(),
+        ),
         GoRoute(
           path: '/exercises/:exerciseId/history',
           builder: (context, state) {
@@ -126,12 +125,19 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (count, error) => null,
         overrides: [
           seedDataProvider.overrideWith((ref) async {}),
           exercisesProvider.overrideWith(
             (ref) => Stream.value(_defaultExercises),
           ),
           recentHomeSessionsProvider.overrideWith((ref) async => sessions),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
         ],
         child: MaterialApp.router(routerConfig: router),
       ),
@@ -153,7 +159,10 @@ Future<void> _pumpHome(
   final router = GoRouter(
     routes: [
       GoRoute(path: '/', redirect: (context, state) => '/home'),
-      GoRoute(path: '/home', builder: (context, state) => const HomeTabContent()),
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => const HomeTabContent(),
+      ),
       GoRoute(
         path: '/exercises/:exerciseId/history',
         builder: (context, state) => const SizedBox.shrink(),
@@ -163,12 +172,17 @@ Future<void> _pumpHome(
 
   await tester.pumpWidget(
     ProviderScope(
+      retry: (count, error) => null,
       overrides: [
         seedDataProvider.overrideWith((ref) async {}),
         exercisesProvider.overrideWith(
           (ref) => Stream.value(_defaultExercises),
         ),
         recentHomeSessionsProvider.overrideWith(recentSessionsLoader),
+        lastHomeSessionProvider.overrideWith((ref) async => null),
+        suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+        activeSplitDetailsProvider.overrideWith((ref) async => null),
+        activeSplitProvider.overrideWith((ref) => const AsyncValue.data(null)),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),

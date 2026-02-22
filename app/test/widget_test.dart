@@ -12,6 +12,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (count, error) => null,
         overrides: [
           seedDataProvider.overrideWith((ref) async {}),
           exercisesProvider.overrideWith(
@@ -30,6 +31,12 @@ void main() {
             (ref) => Stream.value(const {'bench_press': 0}),
           ),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
         ],
         child: const TrainingLogApp(),
       ),

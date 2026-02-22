@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 
 import '../db/app_database.dart';
 import '../db/user_exercise_database.dart';
 import '../models/exercise_with_labels.dart';
 import '../../features/exercises/exercise_repository.dart';
+import '../../features/home/home_workout_logic.dart';
 import '../../features/splits/split_repository.dart';
 import '../../features/workouts/quick_workout_repository.dart';
 
@@ -130,10 +132,7 @@ final bestSetByExerciseProvider = FutureProvider.family<PerformedSet?, String>((
 });
 
 final bestSetByLookupProvider =
-    FutureProvider.family<PerformedSet?, ExerciseHistoryLookup>((
-      ref,
-      lookup,
-    ) {
+    FutureProvider.family<PerformedSet?, ExerciseHistoryLookup>((ref, lookup) {
       return ref
           .watch(quickWorkoutRepositoryProvider)
           .getBestSetForExercises(lookup.exerciseIds);
@@ -164,10 +163,10 @@ final recentSessionsByExerciseProvider =
     });
 
 final recentSessionsByLookupProvider =
-    FutureProvider.family<List<ExerciseSessionHistoryEntry>, ExerciseHistoryLookup>((
-      ref,
-      lookup,
-    ) {
+    FutureProvider.family<
+      List<ExerciseSessionHistoryEntry>,
+      ExerciseHistoryLookup
+    >((ref, lookup) {
       return ref
           .watch(quickWorkoutRepositoryProvider)
           .getRecentSessionsForExercises(
@@ -180,7 +179,21 @@ final recentHomeSessionsProvider =
     FutureProvider<List<HomeSessionOverviewEntry>>((ref) {
       return ref
           .watch(quickWorkoutRepositoryProvider)
-          .getRecentSessionsOverview();
+          .getRecentSessionsOverview(sessionLimit: 5);
+    });
+
+final lastHomeSessionProvider = FutureProvider<HomeSessionOverviewEntry?>((
+  ref,
+) {
+  return ref.watch(quickWorkoutRepositoryProvider).getLastSession();
+});
+
+final suggestedWorkoutCardStateProvider =
+    FutureProvider<SuggestedWorkoutCardState?>((ref) async {
+      return getSuggestedWorkoutCardState(
+        splitRepository: ref.watch(splitRepositoryProvider),
+        workoutRepository: ref.watch(quickWorkoutRepositoryProvider),
+      );
     });
 
 final splitsProvider = StreamProvider<List<SplitSummary>>((ref) {
@@ -204,4 +217,13 @@ final splitDetailsProvider = FutureProvider.family<SplitDetails?, String>((
   splitId,
 ) {
   return ref.watch(splitRepositoryProvider).getSplitById(splitId);
+});
+
+final activeSplitDetailsProvider = FutureProvider<SplitDetails?>((ref) async {
+  final splits = await ref.watch(splitsProvider.future);
+  final active = splits.firstWhereOrNull((split) => split.isActive);
+  if (active == null) {
+    return null;
+  }
+  return ref.watch(splitRepositoryProvider).getSplitById(active.id);
 });

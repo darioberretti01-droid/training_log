@@ -4,73 +4,269 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/state/providers.dart';
+import '../splits/split_repository.dart';
 import '../workouts/quick_workout_repository.dart';
+import 'home_workout_logic.dart';
 
 class HomeTabContent extends ConsumerWidget {
   const HomeTabContent({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final suggestedState = ref.watch(suggestedWorkoutCardStateProvider);
+    final activeSplitState = ref.watch(activeSplitProvider);
+    final lastSessionState = ref.watch(lastHomeSessionProvider);
     final recentSessionsState = ref.watch(recentHomeSessionsProvider);
+    final activeSplitDetailsState = ref.watch(activeSplitDetailsProvider);
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const SizedBox(height: 20),
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: SizedBox(
-              height: 112,
-              width: double.infinity,
-              child: FilledButton(
-                key: const Key('home_log_current_split'),
-                onPressed: () {},
-                child: const Text('Log current split'),
-              ),
-            ),
-          ),
+        Text('Home', style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 6),
+        Text(
+          _activeSplitLine(activeSplitState),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
+        const SizedBox(height: 2),
+        Text(
+          _lastSessionLine(lastSessionState),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 16),
+        _SuggestedWorkoutCard(state: suggestedState),
         const SizedBox(height: 12),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  key: const Key('home_log_other_split'),
-                  onPressed: () {},
-                  child: const Text(
-                    'Log from other split',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  key: const Key('home_log_single_exercises'),
-                  onPressed: () {},
-                  child: const Text(
-                    'Log single exercises',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        _SecondaryActionsRow(
+          activeSplitState: activeSplitDetailsState,
+          onOpenWorkout: (splitId, dayIndex) {
+            context.push(
+              '/workout-logger?mode=split_day'
+              '&splitId=${Uri.encodeComponent(splitId)}'
+              '&dayIndex=$dayIndex',
+            );
+          },
         ),
         const SizedBox(height: 20),
-        const Text(
-          'Recent sessions',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-        ),
+        Text('Recent sessions', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         _RecentSessionsSection(
           state: recentSessionsState,
-          onRetry: () => ref.invalidate(recentHomeSessionsProvider),
+          onRetry: () {
+            ref.invalidate(recentHomeSessionsProvider);
+            ref.invalidate(lastHomeSessionProvider);
+            ref.invalidate(suggestedWorkoutCardStateProvider);
+          },
         ),
       ],
+    );
+  }
+}
+
+String _activeSplitLine(AsyncValue<SplitSummary?> state) {
+  return state.when(
+    data: (split) {
+      if (split == null) {
+        return 'Active split: none';
+      }
+      return 'Active split: ${split.name}';
+    },
+    loading: () => 'Active split: loading...',
+    error: (_, _) => 'Active split: unavailable',
+  );
+}
+
+String _lastSessionLine(AsyncValue<HomeSessionOverviewEntry?> state) {
+  return state.when(
+    data: (session) {
+      if (session == null) {
+        return 'Last session: No sessions yet';
+      }
+      final startedAt = DateTime.fromMillisecondsSinceEpoch(
+        session.session.startedAt,
+      );
+      final label = _sessionDisplayName(session);
+      return 'Last session: $label | ${DateFormat('MMM d').format(startedAt)}';
+    },
+    loading: () => 'Last session: loading...',
+    error: (_, _) => 'Last session: unavailable',
+  );
+}
+
+class _SuggestedWorkoutCard extends StatelessWidget {
+  const _SuggestedWorkoutCard({required this.state});
+
+  final AsyncValue<SuggestedWorkoutCardState?> state;
+
+  @override
+  Widget build(BuildContext context) {
+    return state.when(
+      data: (suggested) {
+        if (suggested == null) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Set an active split to get a workout suggestion.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  const FilledButton(
+                    key: Key('home_log_current_split'),
+                    onPressed: null,
+                    child: Text('Start workout'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Next workout',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Day ${suggested.nextDayIndex}: ${suggested.nextDayName}',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${suggested.exerciseCount} exercises | ~${suggested.estimatedDurationMinutes} min',
+                ),
+                if (suggested.previewExerciseNames.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: suggested.previewExerciseNames
+                        .map((name) => Chip(label: Text(name)))
+                        .toList(growable: false),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                FilledButton(
+                  key: const Key('home_log_current_split'),
+                  onPressed: () {
+                    context.push(
+                      '/workout-logger?mode=split_day'
+                      '&splitId=${Uri.encodeComponent(suggested.splitId)}'
+                      '&dayIndex=${suggested.nextDayIndex}',
+                    );
+                  },
+                  child: const Text('Start workout'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Loading next workout...'),
+        ),
+      ),
+      error: (error, _) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text('Could not load next workout: $error'),
+        ),
+      ),
+    );
+  }
+}
+
+class _SecondaryActionsRow extends StatelessWidget {
+  const _SecondaryActionsRow({
+    required this.activeSplitState,
+    required this.onOpenWorkout,
+  });
+
+  final AsyncValue<SplitDetails?> activeSplitState;
+  final void Function(String splitId, int dayIndex) onOpenWorkout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        OutlinedButton(
+          key: const Key('home_log_other_split'),
+          onPressed: activeSplitState.when(
+            data: (split) {
+              if (split == null || split.days.isEmpty) {
+                return null;
+              }
+              return () => _showDayPicker(
+                context,
+                split: split,
+                onPickDay: onOpenWorkout,
+              );
+            },
+            loading: () => null,
+            error: (_, _) => null,
+          ),
+          child: const Text('Choose another workout'),
+        ),
+        OutlinedButton(
+          key: const Key('home_free_workout'),
+          onPressed: () => context.push('/workout-logger?mode=free'),
+          child: const Text('Free workout'),
+        ),
+        OutlinedButton(
+          key: const Key('home_log_single_exercises'),
+          onPressed: () =>
+              context.push('/workout-logger?mode=free&openPicker=1'),
+          child: const Text('Log single exercise'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showDayPicker(
+    BuildContext context, {
+    required SplitDetails split,
+    required void Function(String splitId, int dayIndex) onPickDay,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                split.name,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            ...split.days.map(
+              (day) => ListTile(
+                title: Text('Day ${day.dayIndex}: ${day.title}'),
+                subtitle: Text('${day.plannedExercises.length} exercises'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onPickDay(split.id, day.dayIndex);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -108,10 +304,7 @@ class _RecentSessionsSection extends StatelessWidget {
       loading: () => const Card(
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: SizedBox(
-            height: 24,
-            child: Center(child: CircularProgressIndicator()),
-          ),
+          child: Text('Loading recent sessions...'),
         ),
       ),
       error: (error, _) => Card(
@@ -138,14 +331,11 @@ class _HomeSessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final startedAt = DateTime.fromMillisecondsSinceEpoch(entry.session.startedAt);
-    final endedAt = DateTime.fromMillisecondsSinceEpoch(entry.session.endedAt);
-    final durationMinutes = endedAt.difference(startedAt).inMinutes;
-
-    final summary = _exerciseSummary(entry.exercises);
-    final metadata = durationMinutes > 0
-        ? '$durationMinutes min | ${entry.totalSets} sets'
-        : '${entry.totalSets} sets';
+    final startedAt = DateTime.fromMillisecondsSinceEpoch(
+      entry.session.startedAt,
+    );
+    final title =
+        '${_sessionDisplayName(entry)} - ${DateFormat('MMM d').format(startedAt)}';
     final primaryExerciseId = entry.exercises.isEmpty
         ? null
         : entry.exercises.first.exerciseId;
@@ -157,29 +347,30 @@ class _HomeSessionCard extends StatelessWidget {
         onTap: primaryExerciseId == null
             ? null
             : () => context.push('/exercises/$primaryExerciseId/history'),
-        title: Text(
-          'Session ${DateFormat('yyyy-MM-dd HH:mm').format(startedAt)}',
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [Text(metadata), Text('Exercises: $summary')],
-        ),
+        title: Text(title),
+        subtitle: Text('${entry.totalSets} sets'),
       ),
     );
   }
 }
 
-String _exerciseSummary(List<HomeSessionExerciseSummary> exercises) {
-  if (exercises.isEmpty) {
-    return 'none';
+String _sessionDisplayName(HomeSessionOverviewEntry entry) {
+  final explicit = entry.sessionName?.trim();
+  if (explicit != null && explicit.isNotEmpty) {
+    return explicit;
   }
-  final names = exercises.map((exercise) => exercise.exerciseName).toList();
-  final firstTwo = names.take(2).join(', ');
-  final hiddenCount = names.length - 2;
-  if (hiddenCount > 0) {
-    return '$firstTwo (+$hiddenCount more)';
+
+  switch (entry.session.sessionType) {
+    case WorkoutSessionMode.splitDay:
+      if (entry.dayIndex != null) {
+        return 'Day ${entry.dayIndex}';
+      }
+      return 'Split workout';
+    case WorkoutSessionMode.free:
+      return 'Free workout';
+    default:
+      return 'Quick workout';
   }
-  return firstTwo;
 }
 
 class OtherTabContent extends StatelessWidget {

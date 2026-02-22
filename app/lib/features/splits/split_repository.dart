@@ -3,6 +3,15 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/db/app_database.dart';
 
+class SplitScheduleMode {
+  static const String sequence = 'sequence';
+  static const String weekday = 'weekday';
+
+  static bool isSupported(String value) {
+    return value == sequence || value == weekday;
+  }
+}
+
 abstract class SplitRepository {
   Future<String> createSplit(SplitDraftInput input);
 
@@ -18,10 +27,15 @@ abstract class SplitRepository {
 }
 
 class SplitDraftInput {
-  const SplitDraftInput({required this.name, required this.days});
+  const SplitDraftInput({
+    required this.name,
+    required this.days,
+    this.scheduleMode = SplitScheduleMode.sequence,
+  });
 
   final String name;
   final List<DayPlanDraftInput> days;
+  final String scheduleMode;
 }
 
 class DayPlanDraftInput {
@@ -60,6 +74,7 @@ class SplitSummary {
   const SplitSummary({
     required this.id,
     required this.name,
+    this.scheduleMode = SplitScheduleMode.sequence,
     required this.isActive,
     required this.dayCount,
     required this.updatedAt,
@@ -67,6 +82,7 @@ class SplitSummary {
 
   final String id;
   final String name;
+  final String scheduleMode;
   final bool isActive;
   final int dayCount;
   final int updatedAt;
@@ -76,6 +92,7 @@ class SplitDetails {
   const SplitDetails({
     required this.id,
     required this.name,
+    this.scheduleMode = SplitScheduleMode.sequence,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -84,6 +101,7 @@ class SplitDetails {
 
   final String id;
   final String name;
+  final String scheduleMode;
   final bool isActive;
   final int createdAt;
   final int updatedAt;
@@ -151,6 +169,7 @@ class DriftSplitRepository implements SplitRepository {
             SplitsCompanion.insert(
               id: splitId,
               name: input.name.trim(),
+              scheduleMode: Value(input.scheduleMode),
               isActive: const Value(false),
               createdAt: nowMs,
               updatedAt: nowMs,
@@ -217,7 +236,11 @@ class DriftSplitRepository implements SplitRepository {
       await (_db.update(
         _db.splits,
       )..where((tbl) => tbl.id.equals(splitId))).write(
-        SplitsCompanion(name: Value(input.name.trim()), updatedAt: Value(nowMs)),
+        SplitsCompanion(
+          name: Value(input.name.trim()),
+          scheduleMode: Value(input.scheduleMode),
+          updatedAt: Value(nowMs),
+        ),
       );
 
       await (_db.delete(
@@ -314,6 +337,7 @@ class DriftSplitRepository implements SplitRepository {
           () => _SplitSummaryAccumulator(
             id: split.id,
             name: split.name,
+            scheduleMode: split.scheduleMode,
             isActive: split.isActive,
             updatedAt: split.updatedAt,
           ),
@@ -329,6 +353,7 @@ class DriftSplitRepository implements SplitRepository {
             (entry) => SplitSummary(
               id: entry.id,
               name: entry.name,
+              scheduleMode: entry.scheduleMode,
               isActive: entry.isActive,
               dayCount: entry.dayCount,
               updatedAt: entry.updatedAt,
@@ -357,6 +382,7 @@ class DriftSplitRepository implements SplitRepository {
       return SplitDetails(
         id: split.id,
         name: split.name,
+        scheduleMode: split.scheduleMode,
         isActive: split.isActive,
         createdAt: split.createdAt,
         updatedAt: split.updatedAt,
@@ -417,6 +443,7 @@ class DriftSplitRepository implements SplitRepository {
     return SplitDetails(
       id: split.id,
       name: split.name,
+      scheduleMode: split.scheduleMode,
       isActive: split.isActive,
       createdAt: split.createdAt,
       updatedAt: split.updatedAt,
@@ -440,6 +467,9 @@ class DriftSplitRepository implements SplitRepository {
     }
     if (input.days.isEmpty) {
       throw ArgumentError('At least one day plan is required.');
+    }
+    if (!SplitScheduleMode.isSupported(input.scheduleMode)) {
+      throw ArgumentError('Unsupported schedule mode: ${input.scheduleMode}.');
     }
 
     final orderedDays = [...input.days]
@@ -508,12 +538,14 @@ class _SplitSummaryAccumulator {
   _SplitSummaryAccumulator({
     required this.id,
     required this.name,
+    required this.scheduleMode,
     required this.isActive,
     required this.updatedAt,
   });
 
   final String id;
   final String name;
+  final String scheduleMode;
   final bool isActive;
   final int updatedAt;
   int dayCount = 0;

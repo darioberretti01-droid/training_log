@@ -823,6 +823,39 @@ class $WorkoutSessionsTable extends WorkoutSessions
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _splitIdMeta = const VerificationMeta(
+    'splitId',
+  );
+  @override
+  late final GeneratedColumn<String> splitId = GeneratedColumn<String>(
+    'split_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dayIndexMeta = const VerificationMeta(
+    'dayIndex',
+  );
+  @override
+  late final GeneratedColumn<int> dayIndex = GeneratedColumn<int>(
+    'day_index',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sessionNameMeta = const VerificationMeta(
+    'sessionName',
+  );
+  @override
+  late final GeneratedColumn<String> sessionName = GeneratedColumn<String>(
+    'session_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _startedAtMeta = const VerificationMeta(
     'startedAt',
   );
@@ -846,7 +879,15 @@ class $WorkoutSessionsTable extends WorkoutSessions
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, sessionType, startedAt, endedAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    sessionType,
+    splitId,
+    dayIndex,
+    sessionName,
+    startedAt,
+    endedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -874,6 +915,27 @@ class $WorkoutSessionsTable extends WorkoutSessions
       );
     } else if (isInserting) {
       context.missing(_sessionTypeMeta);
+    }
+    if (data.containsKey('split_id')) {
+      context.handle(
+        _splitIdMeta,
+        splitId.isAcceptableOrUnknown(data['split_id']!, _splitIdMeta),
+      );
+    }
+    if (data.containsKey('day_index')) {
+      context.handle(
+        _dayIndexMeta,
+        dayIndex.isAcceptableOrUnknown(data['day_index']!, _dayIndexMeta),
+      );
+    }
+    if (data.containsKey('session_name')) {
+      context.handle(
+        _sessionNameMeta,
+        sessionName.isAcceptableOrUnknown(
+          data['session_name']!,
+          _sessionNameMeta,
+        ),
+      );
     }
     if (data.containsKey('started_at')) {
       context.handle(
@@ -908,6 +970,18 @@ class $WorkoutSessionsTable extends WorkoutSessions
         DriftSqlType.string,
         data['${effectivePrefix}session_type'],
       )!,
+      splitId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}split_id'],
+      ),
+      dayIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}day_index'],
+      ),
+      sessionName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_name'],
+      ),
       startedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}started_at'],
@@ -928,11 +1002,17 @@ class $WorkoutSessionsTable extends WorkoutSessions
 class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
   final String id;
   final String sessionType;
+  final String? splitId;
+  final int? dayIndex;
+  final String? sessionName;
   final int startedAt;
   final int endedAt;
   const WorkoutSession({
     required this.id,
     required this.sessionType,
+    this.splitId,
+    this.dayIndex,
+    this.sessionName,
     required this.startedAt,
     required this.endedAt,
   });
@@ -941,6 +1021,15 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['session_type'] = Variable<String>(sessionType);
+    if (!nullToAbsent || splitId != null) {
+      map['split_id'] = Variable<String>(splitId);
+    }
+    if (!nullToAbsent || dayIndex != null) {
+      map['day_index'] = Variable<int>(dayIndex);
+    }
+    if (!nullToAbsent || sessionName != null) {
+      map['session_name'] = Variable<String>(sessionName);
+    }
     map['started_at'] = Variable<int>(startedAt);
     map['ended_at'] = Variable<int>(endedAt);
     return map;
@@ -950,6 +1039,15 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     return WorkoutSessionsCompanion(
       id: Value(id),
       sessionType: Value(sessionType),
+      splitId: splitId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(splitId),
+      dayIndex: dayIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dayIndex),
+      sessionName: sessionName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionName),
       startedAt: Value(startedAt),
       endedAt: Value(endedAt),
     );
@@ -963,6 +1061,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     return WorkoutSession(
       id: serializer.fromJson<String>(json['id']),
       sessionType: serializer.fromJson<String>(json['sessionType']),
+      splitId: serializer.fromJson<String?>(json['splitId']),
+      dayIndex: serializer.fromJson<int?>(json['dayIndex']),
+      sessionName: serializer.fromJson<String?>(json['sessionName']),
       startedAt: serializer.fromJson<int>(json['startedAt']),
       endedAt: serializer.fromJson<int>(json['endedAt']),
     );
@@ -973,6 +1074,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'sessionType': serializer.toJson<String>(sessionType),
+      'splitId': serializer.toJson<String?>(splitId),
+      'dayIndex': serializer.toJson<int?>(dayIndex),
+      'sessionName': serializer.toJson<String?>(sessionName),
       'startedAt': serializer.toJson<int>(startedAt),
       'endedAt': serializer.toJson<int>(endedAt),
     };
@@ -981,11 +1085,17 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
   WorkoutSession copyWith({
     String? id,
     String? sessionType,
+    Value<String?> splitId = const Value.absent(),
+    Value<int?> dayIndex = const Value.absent(),
+    Value<String?> sessionName = const Value.absent(),
     int? startedAt,
     int? endedAt,
   }) => WorkoutSession(
     id: id ?? this.id,
     sessionType: sessionType ?? this.sessionType,
+    splitId: splitId.present ? splitId.value : this.splitId,
+    dayIndex: dayIndex.present ? dayIndex.value : this.dayIndex,
+    sessionName: sessionName.present ? sessionName.value : this.sessionName,
     startedAt: startedAt ?? this.startedAt,
     endedAt: endedAt ?? this.endedAt,
   );
@@ -995,6 +1105,11 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       sessionType: data.sessionType.present
           ? data.sessionType.value
           : this.sessionType,
+      splitId: data.splitId.present ? data.splitId.value : this.splitId,
+      dayIndex: data.dayIndex.present ? data.dayIndex.value : this.dayIndex,
+      sessionName: data.sessionName.present
+          ? data.sessionName.value
+          : this.sessionName,
       startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
       endedAt: data.endedAt.present ? data.endedAt.value : this.endedAt,
     );
@@ -1005,6 +1120,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     return (StringBuffer('WorkoutSession(')
           ..write('id: $id, ')
           ..write('sessionType: $sessionType, ')
+          ..write('splitId: $splitId, ')
+          ..write('dayIndex: $dayIndex, ')
+          ..write('sessionName: $sessionName, ')
           ..write('startedAt: $startedAt, ')
           ..write('endedAt: $endedAt')
           ..write(')'))
@@ -1012,13 +1130,24 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
   }
 
   @override
-  int get hashCode => Object.hash(id, sessionType, startedAt, endedAt);
+  int get hashCode => Object.hash(
+    id,
+    sessionType,
+    splitId,
+    dayIndex,
+    sessionName,
+    startedAt,
+    endedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is WorkoutSession &&
           other.id == this.id &&
           other.sessionType == this.sessionType &&
+          other.splitId == this.splitId &&
+          other.dayIndex == this.dayIndex &&
+          other.sessionName == this.sessionName &&
           other.startedAt == this.startedAt &&
           other.endedAt == this.endedAt);
 }
@@ -1026,12 +1155,18 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
 class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
   final Value<String> id;
   final Value<String> sessionType;
+  final Value<String?> splitId;
+  final Value<int?> dayIndex;
+  final Value<String?> sessionName;
   final Value<int> startedAt;
   final Value<int> endedAt;
   final Value<int> rowid;
   const WorkoutSessionsCompanion({
     this.id = const Value.absent(),
     this.sessionType = const Value.absent(),
+    this.splitId = const Value.absent(),
+    this.dayIndex = const Value.absent(),
+    this.sessionName = const Value.absent(),
     this.startedAt = const Value.absent(),
     this.endedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1039,6 +1174,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
   WorkoutSessionsCompanion.insert({
     required String id,
     required String sessionType,
+    this.splitId = const Value.absent(),
+    this.dayIndex = const Value.absent(),
+    this.sessionName = const Value.absent(),
     required int startedAt,
     required int endedAt,
     this.rowid = const Value.absent(),
@@ -1049,6 +1187,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
   static Insertable<WorkoutSession> custom({
     Expression<String>? id,
     Expression<String>? sessionType,
+    Expression<String>? splitId,
+    Expression<int>? dayIndex,
+    Expression<String>? sessionName,
     Expression<int>? startedAt,
     Expression<int>? endedAt,
     Expression<int>? rowid,
@@ -1056,6 +1197,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (sessionType != null) 'session_type': sessionType,
+      if (splitId != null) 'split_id': splitId,
+      if (dayIndex != null) 'day_index': dayIndex,
+      if (sessionName != null) 'session_name': sessionName,
       if (startedAt != null) 'started_at': startedAt,
       if (endedAt != null) 'ended_at': endedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1065,6 +1209,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
   WorkoutSessionsCompanion copyWith({
     Value<String>? id,
     Value<String>? sessionType,
+    Value<String?>? splitId,
+    Value<int?>? dayIndex,
+    Value<String?>? sessionName,
     Value<int>? startedAt,
     Value<int>? endedAt,
     Value<int>? rowid,
@@ -1072,6 +1219,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     return WorkoutSessionsCompanion(
       id: id ?? this.id,
       sessionType: sessionType ?? this.sessionType,
+      splitId: splitId ?? this.splitId,
+      dayIndex: dayIndex ?? this.dayIndex,
+      sessionName: sessionName ?? this.sessionName,
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
       rowid: rowid ?? this.rowid,
@@ -1086,6 +1236,15 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     }
     if (sessionType.present) {
       map['session_type'] = Variable<String>(sessionType.value);
+    }
+    if (splitId.present) {
+      map['split_id'] = Variable<String>(splitId.value);
+    }
+    if (dayIndex.present) {
+      map['day_index'] = Variable<int>(dayIndex.value);
+    }
+    if (sessionName.present) {
+      map['session_name'] = Variable<String>(sessionName.value);
     }
     if (startedAt.present) {
       map['started_at'] = Variable<int>(startedAt.value);
@@ -1104,6 +1263,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     return (StringBuffer('WorkoutSessionsCompanion(')
           ..write('id: $id, ')
           ..write('sessionType: $sessionType, ')
+          ..write('splitId: $splitId, ')
+          ..write('dayIndex: $dayIndex, ')
+          ..write('sessionName: $sessionName, ')
           ..write('startedAt: $startedAt, ')
           ..write('endedAt: $endedAt, ')
           ..write('rowid: $rowid')
@@ -1709,6 +1871,18 @@ class $SplitsTable extends Splits with TableInfo<$SplitsTable, Split> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _scheduleModeMeta = const VerificationMeta(
+    'scheduleMode',
+  );
+  @override
+  late final GeneratedColumn<String> scheduleMode = GeneratedColumn<String>(
+    'schedule_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('sequence'),
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -1750,6 +1924,7 @@ class $SplitsTable extends Splits with TableInfo<$SplitsTable, Split> {
   List<GeneratedColumn> get $columns => [
     id,
     name,
+    scheduleMode,
     isActive,
     createdAt,
     updatedAt,
@@ -1778,6 +1953,15 @@ class $SplitsTable extends Splits with TableInfo<$SplitsTable, Split> {
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('schedule_mode')) {
+      context.handle(
+        _scheduleModeMeta,
+        scheduleMode.isAcceptableOrUnknown(
+          data['schedule_mode']!,
+          _scheduleModeMeta,
+        ),
+      );
     }
     if (data.containsKey('is_active')) {
       context.handle(
@@ -1818,6 +2002,10 @@ class $SplitsTable extends Splits with TableInfo<$SplitsTable, Split> {
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      scheduleMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}schedule_mode'],
+      )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -1842,12 +2030,14 @@ class $SplitsTable extends Splits with TableInfo<$SplitsTable, Split> {
 class Split extends DataClass implements Insertable<Split> {
   final String id;
   final String name;
+  final String scheduleMode;
   final bool isActive;
   final int createdAt;
   final int updatedAt;
   const Split({
     required this.id,
     required this.name,
+    required this.scheduleMode,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -1857,6 +2047,7 @@ class Split extends DataClass implements Insertable<Split> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
+    map['schedule_mode'] = Variable<String>(scheduleMode);
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
@@ -1867,6 +2058,7 @@ class Split extends DataClass implements Insertable<Split> {
     return SplitsCompanion(
       id: Value(id),
       name: Value(name),
+      scheduleMode: Value(scheduleMode),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -1881,6 +2073,7 @@ class Split extends DataClass implements Insertable<Split> {
     return Split(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      scheduleMode: serializer.fromJson<String>(json['scheduleMode']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
@@ -1892,6 +2085,7 @@ class Split extends DataClass implements Insertable<Split> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
+      'scheduleMode': serializer.toJson<String>(scheduleMode),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
@@ -1901,12 +2095,14 @@ class Split extends DataClass implements Insertable<Split> {
   Split copyWith({
     String? id,
     String? name,
+    String? scheduleMode,
     bool? isActive,
     int? createdAt,
     int? updatedAt,
   }) => Split(
     id: id ?? this.id,
     name: name ?? this.name,
+    scheduleMode: scheduleMode ?? this.scheduleMode,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -1915,6 +2111,9 @@ class Split extends DataClass implements Insertable<Split> {
     return Split(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      scheduleMode: data.scheduleMode.present
+          ? data.scheduleMode.value
+          : this.scheduleMode,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -1926,6 +2125,7 @@ class Split extends DataClass implements Insertable<Split> {
     return (StringBuffer('Split(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('scheduleMode: $scheduleMode, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -1934,13 +2134,15 @@ class Split extends DataClass implements Insertable<Split> {
   }
 
   @override
-  int get hashCode => Object.hash(id, name, isActive, createdAt, updatedAt);
+  int get hashCode =>
+      Object.hash(id, name, scheduleMode, isActive, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Split &&
           other.id == this.id &&
           other.name == this.name &&
+          other.scheduleMode == this.scheduleMode &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -1949,6 +2151,7 @@ class Split extends DataClass implements Insertable<Split> {
 class SplitsCompanion extends UpdateCompanion<Split> {
   final Value<String> id;
   final Value<String> name;
+  final Value<String> scheduleMode;
   final Value<bool> isActive;
   final Value<int> createdAt;
   final Value<int> updatedAt;
@@ -1956,6 +2159,7 @@ class SplitsCompanion extends UpdateCompanion<Split> {
   const SplitsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.scheduleMode = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1964,6 +2168,7 @@ class SplitsCompanion extends UpdateCompanion<Split> {
   SplitsCompanion.insert({
     required String id,
     required String name,
+    this.scheduleMode = const Value.absent(),
     this.isActive = const Value.absent(),
     required int createdAt,
     required int updatedAt,
@@ -1975,6 +2180,7 @@ class SplitsCompanion extends UpdateCompanion<Split> {
   static Insertable<Split> custom({
     Expression<String>? id,
     Expression<String>? name,
+    Expression<String>? scheduleMode,
     Expression<bool>? isActive,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
@@ -1983,6 +2189,7 @@ class SplitsCompanion extends UpdateCompanion<Split> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (scheduleMode != null) 'schedule_mode': scheduleMode,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1993,6 +2200,7 @@ class SplitsCompanion extends UpdateCompanion<Split> {
   SplitsCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
+    Value<String>? scheduleMode,
     Value<bool>? isActive,
     Value<int>? createdAt,
     Value<int>? updatedAt,
@@ -2001,6 +2209,7 @@ class SplitsCompanion extends UpdateCompanion<Split> {
     return SplitsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      scheduleMode: scheduleMode ?? this.scheduleMode,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -2016,6 +2225,9 @@ class SplitsCompanion extends UpdateCompanion<Split> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (scheduleMode.present) {
+      map['schedule_mode'] = Variable<String>(scheduleMode.value);
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -2037,6 +2249,7 @@ class SplitsCompanion extends UpdateCompanion<Split> {
     return (StringBuffer('SplitsCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('scheduleMode: $scheduleMode, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -4319,6 +4532,9 @@ typedef $$WorkoutSessionsTableCreateCompanionBuilder =
     WorkoutSessionsCompanion Function({
       required String id,
       required String sessionType,
+      Value<String?> splitId,
+      Value<int?> dayIndex,
+      Value<String?> sessionName,
       required int startedAt,
       required int endedAt,
       Value<int> rowid,
@@ -4327,6 +4543,9 @@ typedef $$WorkoutSessionsTableUpdateCompanionBuilder =
     WorkoutSessionsCompanion Function({
       Value<String> id,
       Value<String> sessionType,
+      Value<String?> splitId,
+      Value<int?> dayIndex,
+      Value<String?> sessionName,
       Value<int> startedAt,
       Value<int> endedAt,
       Value<int> rowid,
@@ -4379,6 +4598,21 @@ class $$WorkoutSessionsTableFilterComposer
 
   ColumnFilters<String> get sessionType => $composableBuilder(
     column: $table.sessionType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get splitId => $composableBuilder(
+    column: $table.splitId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dayIndex => $composableBuilder(
+    column: $table.dayIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionName => $composableBuilder(
+    column: $table.sessionName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4437,6 +4671,21 @@ class $$WorkoutSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get splitId => $composableBuilder(
+    column: $table.splitId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dayIndex => $composableBuilder(
+    column: $table.dayIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionName => $composableBuilder(
+    column: $table.sessionName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get startedAt => $composableBuilder(
     column: $table.startedAt,
     builder: (column) => ColumnOrderings(column),
@@ -4462,6 +4711,17 @@ class $$WorkoutSessionsTableAnnotationComposer
 
   GeneratedColumn<String> get sessionType => $composableBuilder(
     column: $table.sessionType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get splitId =>
+      $composableBuilder(column: $table.splitId, builder: (column) => column);
+
+  GeneratedColumn<int> get dayIndex =>
+      $composableBuilder(column: $table.dayIndex, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionName => $composableBuilder(
+    column: $table.sessionName,
     builder: (column) => column,
   );
 
@@ -4529,12 +4789,18 @@ class $$WorkoutSessionsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> sessionType = const Value.absent(),
+                Value<String?> splitId = const Value.absent(),
+                Value<int?> dayIndex = const Value.absent(),
+                Value<String?> sessionName = const Value.absent(),
                 Value<int> startedAt = const Value.absent(),
                 Value<int> endedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkoutSessionsCompanion(
                 id: id,
                 sessionType: sessionType,
+                splitId: splitId,
+                dayIndex: dayIndex,
+                sessionName: sessionName,
                 startedAt: startedAt,
                 endedAt: endedAt,
                 rowid: rowid,
@@ -4543,12 +4809,18 @@ class $$WorkoutSessionsTableTableManager
               ({
                 required String id,
                 required String sessionType,
+                Value<String?> splitId = const Value.absent(),
+                Value<int?> dayIndex = const Value.absent(),
+                Value<String?> sessionName = const Value.absent(),
                 required int startedAt,
                 required int endedAt,
                 Value<int> rowid = const Value.absent(),
               }) => WorkoutSessionsCompanion.insert(
                 id: id,
                 sessionType: sessionType,
+                splitId: splitId,
+                dayIndex: dayIndex,
+                sessionName: sessionName,
                 startedAt: startedAt,
                 endedAt: endedAt,
                 rowid: rowid,
@@ -5106,6 +5378,7 @@ typedef $$SplitsTableCreateCompanionBuilder =
     SplitsCompanion Function({
       required String id,
       required String name,
+      Value<String> scheduleMode,
       Value<bool> isActive,
       required int createdAt,
       required int updatedAt,
@@ -5115,6 +5388,7 @@ typedef $$SplitsTableUpdateCompanionBuilder =
     SplitsCompanion Function({
       Value<String> id,
       Value<String> name,
+      Value<String> scheduleMode,
       Value<bool> isActive,
       Value<int> createdAt,
       Value<int> updatedAt,
@@ -5161,6 +5435,11 @@ class $$SplitsTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get scheduleMode => $composableBuilder(
+    column: $table.scheduleMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5224,6 +5503,11 @@ class $$SplitsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get scheduleMode => $composableBuilder(
+    column: $table.scheduleMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -5254,6 +5538,11 @@ class $$SplitsTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get scheduleMode => $composableBuilder(
+    column: $table.scheduleMode,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -5320,6 +5609,7 @@ class $$SplitsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String> scheduleMode = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
@@ -5327,6 +5617,7 @@ class $$SplitsTableTableManager
               }) => SplitsCompanion(
                 id: id,
                 name: name,
+                scheduleMode: scheduleMode,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -5336,6 +5627,7 @@ class $$SplitsTableTableManager
               ({
                 required String id,
                 required String name,
+                Value<String> scheduleMode = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 required int createdAt,
                 required int updatedAt,
@@ -5343,6 +5635,7 @@ class $$SplitsTableTableManager
               }) => SplitsCompanion.insert(
                 id: id,
                 name: name,
+                scheduleMode: scheduleMode,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

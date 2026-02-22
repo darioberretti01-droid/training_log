@@ -11,6 +11,7 @@ import '../features/splits/split_builder_screen.dart';
 import '../features/splits/split_detail_screen.dart';
 import '../features/splits/splits_screen.dart';
 import '../features/workouts/quick_workout_screen.dart';
+import '../features/workouts/workout_logger_screen.dart';
 import 'root_shell.dart';
 
 final appRouter = GoRouter(
@@ -21,7 +22,28 @@ final appRouter = GoRouter(
         return RootShell(state: state, child: child);
       },
       routes: [
-        GoRoute(path: '/home', builder: (context, state) => const HomeTabContent()),
+        GoRoute(
+          path: '/home',
+          builder: (context, state) => const HomeTabContent(),
+        ),
+        GoRoute(
+          path: '/workout-logger',
+          builder: (context, state) {
+            final mode = state.uri.queryParameters['mode'] ?? '';
+            final splitId = state.uri.queryParameters['splitId'];
+            final dayIndex = int.tryParse(
+              state.uri.queryParameters['dayIndex'] ?? '',
+            );
+            final openPicker = state.uri.queryParameters['openPicker'] == '1';
+
+            return WorkoutLoggerScreen(
+              mode: mode,
+              splitId: splitId,
+              dayIndex: dayIndex,
+              openPickerOnStart: openPicker,
+            );
+          },
+        ),
         GoRoute(
           path: '/splits',
           builder: (context, state) => const SplitsScreen(),
@@ -95,5 +117,6 @@ final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
 );
 
-final GlobalKey<NavigatorState> _rootNavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
