@@ -1,0 +1,49 @@
+name: Screenshot Capture
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Run screenshot pipeline
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            cd app
+            flutter pub get
+            mkdir -p screenshots/current
+            flutter drive --driver=test_driver/screenshots_driver.dart --target=integration_test/screenshots_flow_test.dart -d emulator-5554
+            dart run tool/validate_screenshots.dart
+            dart run tool/generate_screenshot_index.dart
+
+      - name: Upload screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-current
+          path: app/screenshots/current
+
+      - name: Upload screenshot docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-docs
+          path: docs/05_screenshots.md
+

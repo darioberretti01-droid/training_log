@@ -1,13 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:collection/collection.dart';
 
 import '../db/app_database.dart';
 import '../db/user_exercise_database.dart';
 import '../models/exercise_with_labels.dart';
+import '../time/app_clock.dart';
+import '../../devtools/demo_fixture_service.dart';
 import '../../features/exercises/exercise_repository.dart';
 import '../../features/home/home_workout_logic.dart';
 import '../../features/splits/split_repository.dart';
+import '../../features/workouts/workout_draft.dart';
+import '../../features/workouts/workout_draft_storage.dart';
 import '../../features/workouts/quick_workout_repository.dart';
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
@@ -21,6 +24,8 @@ final userExerciseDatabaseProvider = Provider<UserExerciseDatabase>((ref) {
   ref.onDispose(database.close);
   return database;
 });
+
+final appClockProvider = Provider<AppClock>((ref) => DateTime.now);
 
 final exerciseRepositoryProvider = Provider<ExerciseRepository>((ref) {
   return DriftExerciseRepository(
@@ -188,11 +193,39 @@ final lastHomeSessionProvider = FutureProvider<HomeSessionOverviewEntry?>((
   return ref.watch(quickWorkoutRepositoryProvider).getLastSession();
 });
 
+final lastSplitDaySessionProvider = FutureProvider<HomeSessionOverviewEntry?>((
+  ref,
+) {
+  return ref
+      .watch(quickWorkoutRepositoryProvider)
+      .getLastSession(sessionType: WorkoutSessionMode.splitDay);
+});
+
 final suggestedWorkoutCardStateProvider =
     FutureProvider<SuggestedWorkoutCardState?>((ref) async {
-      return getSuggestedWorkoutCardState(
-        splitRepository: ref.watch(splitRepositoryProvider),
-        workoutRepository: ref.watch(quickWorkoutRepositoryProvider),
+      final activeSplitSummary = ref
+          .watch(activeSplitProvider)
+          .maybeWhen(data: (value) => value, orElse: () => null);
+      if (activeSplitSummary == null) {
+        return null;
+      }
+
+      final activeSplitDetails = await ref.watch(
+        splitDetailsProvider(activeSplitSummary.id).future,
+      );
+      if (activeSplitDetails == null) {
+        return null;
+      }
+
+      final lastSession = await ref
+          .watch(quickWorkoutRepositoryProvider)
+          .getLastSession(
+            sessionType: WorkoutSessionMode.splitDay,
+            splitId: activeSplitSummary.id,
+          );
+      return buildSuggestedWorkoutCardState(
+        activeSplit: activeSplitDetails,
+        lastSession: lastSession,
       );
     });
 
@@ -220,10 +253,74 @@ final splitDetailsProvider = FutureProvider.family<SplitDetails?, String>((
 });
 
 final activeSplitDetailsProvider = FutureProvider<SplitDetails?>((ref) async {
-  final splits = await ref.watch(splitsProvider.future);
-  final active = splits.firstWhereOrNull((split) => split.isActive);
-  if (active == null) {
+  final activeSummary = ref
+      .watch(activeSplitProvider)
+      .maybeWhen(data: (value) => value, orElse: () => null);
+  if (activeSummary == null) {
     return null;
   }
-  return ref.watch(splitRepositoryProvider).getSplitById(active.id);
+  return ref.watch(splitRepositoryProvider).getSplitById(activeSummary.id);
+});
+
+final sessionDetailsProvider =
+    FutureProvider.family<WorkoutSessionDetails?, String>((ref, sessionId) {
+      return ref
+          .watch(quickWorkoutRepositoryProvider)
+          .getSessionDetails(sessionId);
+    });
+
+class WorkoutDraftNotifier extends Notifier<WorkoutDraft?> {
+  @override
+  WorkoutDraft? build() => null;
+
+  void setDraft(WorkoutDraft? draft) {
+    state = draft;
+  }
+
+  void clearDraft() {
+    state = null;
+  }
+}
+
+final workoutDraftProvider =
+    NotifierProvider<WorkoutDraftNotifier, WorkoutDraft?>(
+      WorkoutDraftNotifier.new,
+    );
+
+final workoutDraftStorageProvider = Provider<WorkoutDraftStorage>((ref) {
+  return WorkoutDraftStorage(ref.watch(appDatabaseProvider));
+});
+
+final demoFixtureServiceProvider = Provider<DemoFixtureService>((ref) {
+  return DemoFixtureService(
+    appDb: ref.watch(appDatabaseProvider),
+    userDb: ref.watch(userExerciseDatabaseProvider),
+    exerciseRepository: ref.watch(exerciseRepositoryProvider),
+    workoutDraftStorage: ref.watch(workoutDraftStorageProvider),
+  );
+});
+
+final persistedWorkoutDraftProvider = FutureProvider<WorkoutDraft?>((ref) {
+  return ref.watch(workoutDraftStorageProvider).loadDraft();
+});
+
+final effectiveWorkoutDraftProvider = Provider<WorkoutDraft?>((ref) {
+  final inMemory = ref.watch(workoutDraftProvider);
+  if (inMemory != null) {
+    return inMemory;
+  }
+  return ref
+      .watch(persistedWorkoutDraftProvider)
+      .maybeWhen(data: (value) => value, orElse: () => null);
+});
+
+final todayWorkoutDraftProvider = Provider<WorkoutDraft?>((ref) {
+  final draft = ref.watch(effectiveWorkoutDraftProvider);
+  if (draft == null) {
+    return null;
+  }
+  if (!draft.isForToday(ref.watch(appClockProvider)())) {
+    return null;
+  }
+  return draft;
 });

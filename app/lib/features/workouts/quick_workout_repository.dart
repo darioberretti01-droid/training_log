@@ -70,6 +70,17 @@ abstract class QuickWorkoutRepository {
     String? sessionType,
     String? splitId,
   });
+
+  Future<WorkoutSessionDetails?> getSessionDetails(String sessionId);
+
+  Future<void> updateWorkoutSession({
+    required String sessionId,
+    required DateTime endedAt,
+    required List<WorkoutExerciseLogInput> exercises,
+    String? sessionName,
+  });
+
+  Future<void> deleteWorkoutSession(String sessionId);
 }
 
 class ExerciseSessionHistoryEntry {
@@ -110,6 +121,49 @@ class HomeSessionExerciseSummary {
   final String exerciseId;
   final String exerciseName;
   final int setCount;
+}
+
+class WorkoutSessionDetails {
+  const WorkoutSessionDetails({required this.session, required this.exercises});
+
+  final WorkoutSession session;
+  final List<WorkoutSessionExerciseDetails> exercises;
+
+  int get totalSets {
+    var total = 0;
+    for (final exercise in exercises) {
+      total += exercise.sets.length;
+    }
+    return total;
+  }
+}
+
+class WorkoutSessionExerciseDetails {
+  const WorkoutSessionExerciseDetails({
+    required this.exerciseId,
+    required this.exerciseName,
+    required this.sets,
+  });
+
+  final String exerciseId;
+  final String exerciseName;
+  final List<WorkoutSessionSetDetails> sets;
+}
+
+class WorkoutSessionSetDetails {
+  const WorkoutSessionSetDetails({
+    required this.setIndex,
+    required this.reps,
+    required this.weightKg,
+    this.restSeconds,
+    this.rpe,
+  });
+
+  final int setIndex;
+  final int reps;
+  final double weightKg;
+  final int? restSeconds;
+  final double? rpe;
 }
 
 class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
@@ -467,6 +521,166 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
     return sessions.first;
   }
 
+  @override
+  Future<WorkoutSessionDetails?> getSessionDetails(String sessionId) async {
+    final session = await (_db.select(
+      _db.workoutSessions,
+    )..where((tbl) => tbl.id.equals(sessionId))).getSingleOrNull();
+    if (session == null) {
+      return null;
+    }
+
+    final rows =
+        await (_db.select(_db.performedSets).join([
+                innerJoin(
+                  _db.exercises,
+                  _db.exercises.id.equalsExp(_db.performedSets.exerciseId),
+                ),
+              ])
+              ..where(_db.performedSets.sessionId.equals(sessionId))
+              ..orderBy([
+                OrderingTerm.asc(_db.exercises.name),
+                OrderingTerm.asc(_db.performedSets.exerciseId),
+                OrderingTerm.asc(_db.performedSets.setIndex),
+              ]))
+            .get();
+
+    final grouped = <String, _SessionExerciseAccumulator>{};
+    final orderedExerciseIds = <String>[];
+
+    for (final row in rows) {
+      final set = row.readTable(_db.performedSets);
+      final exercise = row.readTable(_db.exercises);
+      final entry = grouped.putIfAbsent(exercise.id, () {
+        orderedExerciseIds.add(exercise.id);
+        return _SessionExerciseAccumulator(
+          exerciseId: exercise.id,
+          exerciseName: exercise.name,
+        );
+      });
+      entry.sets.add(
+        WorkoutSessionSetDetails(
+          setIndex: set.setIndex,
+          reps: set.reps,
+          weightKg: set.weightKg,
+          restSeconds: set.restSeconds,
+          rpe: set.rpe,
+        ),
+      );
+    }
+
+    final exercises = orderedExerciseIds
+        .map((exerciseId) {
+          final entry = grouped[exerciseId]!;
+          return WorkoutSessionExerciseDetails(
+            exerciseId: entry.exerciseId,
+            exerciseName: entry.exerciseName,
+            sets: List.unmodifiable(entry.sets),
+          );
+        })
+        .toList(growable: false);
+
+    return WorkoutSessionDetails(
+      session: session,
+      exercises: List.unmodifiable(exercises),
+    );
+  }
+
+  @override
+  Future<void> updateWorkoutSession({
+    required String sessionId,
+    required DateTime endedAt,
+    required List<WorkoutExerciseLogInput> exercises,
+    String? sessionName,
+  }) async {
+    final existing = await (_db.select(
+      _db.workoutSessions,
+    )..where((tbl) => tbl.id.equals(sessionId))).getSingleOrNull();
+    if (existing == null) {
+      throw ArgumentError('Session not found: $sessionId');
+    }
+    final endedAtMs = endedAt.millisecondsSinceEpoch;
+    if (endedAtMs < existing.startedAt) {
+      throw ArgumentError('End time cannot be before start time.');
+    }
+
+    final normalizedExercises = <WorkoutExerciseLogInput>[];
+    for (final exercise in exercises) {
+      final normalizedExerciseId = exercise.exerciseId.trim();
+      if (normalizedExerciseId.isEmpty) {
+        throw ArgumentError('exerciseId cannot be empty.');
+      }
+      final validSets = <LoggedSetInput>[];
+      for (final set in exercise.sets) {
+        _validateSet(set);
+        validSets.add(set);
+      }
+      if (validSets.isEmpty) {
+        continue;
+      }
+      normalizedExercises.add(
+        WorkoutExerciseLogInput(
+          exerciseId: normalizedExerciseId,
+          sets: List.unmodifiable(validSets),
+        ),
+      );
+    }
+    if (normalizedExercises.isEmpty) {
+      throw ArgumentError('At least one set is required.');
+    }
+
+    await _db.transaction(() async {
+      await (_db.update(
+        _db.workoutSessions,
+      )..where((tbl) => tbl.id.equals(sessionId))).write(
+        WorkoutSessionsCompanion(
+          endedAt: Value(endedAtMs),
+          sessionName: Value(_normalizeOptionalString(sessionName)),
+        ),
+      );
+
+      await (_db.delete(
+        _db.performedSets,
+      )..where((tbl) => tbl.sessionId.equals(sessionId))).go();
+
+      for (final exercise in normalizedExercises) {
+        for (var index = 0; index < exercise.sets.length; index++) {
+          final set = exercise.sets[index];
+          await _db
+              .into(_db.performedSets)
+              .insert(
+                PerformedSetsCompanion.insert(
+                  id: _uuid.v4(),
+                  sessionId: sessionId,
+                  exerciseId: exercise.exerciseId,
+                  setIndex: index + 1,
+                  reps: set.reps,
+                  weightKg: set.weightKg,
+                  performedAt: endedAtMs,
+                  restSeconds: Value(set.restSeconds),
+                  rpe: Value(set.rpe),
+                ),
+              );
+        }
+      }
+    });
+  }
+
+  @override
+  Future<void> deleteWorkoutSession(String sessionId) async {
+    final deleted = await _db.transaction(() async {
+      await (_db.delete(
+        _db.performedSets,
+      )..where((tbl) => tbl.sessionId.equals(sessionId))).go();
+      return (_db.delete(
+        _db.workoutSessions,
+      )..where((tbl) => tbl.id.equals(sessionId))).go();
+    });
+    if (deleted == 0) {
+      throw ArgumentError('Session not found: $sessionId');
+    }
+  }
+
   void _validateSet(LoggedSetInput set) {
     if (set.reps <= 0) {
       throw ArgumentError('Reps must be greater than zero.');
@@ -557,4 +771,15 @@ class _HomeExerciseAccumulator {
   final String exerciseId;
   final String exerciseName;
   int setCount;
+}
+
+class _SessionExerciseAccumulator {
+  _SessionExerciseAccumulator({
+    required this.exerciseId,
+    required this.exerciseName,
+  });
+
+  final String exerciseId;
+  final String exerciseName;
+  final List<WorkoutSessionSetDetails> sets = [];
 }

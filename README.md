@@ -39,6 +39,8 @@ Beginner-first Flutter project for a smartphone training log.
   - current architecture, data model, flow, and test strategy
 - `docs/04_change_log.md`
   - detailed commit-by-commit implementation notes
+- `docs/05_screenshots.md`
+  - auto-generated screenshot index from integration manifest
 
 ## Development Workflow
 From `app/`:
@@ -57,3 +59,9 @@ flutter run -d emulator-5554
 - `scripts/windows/init_git_repo.ps1`
 
 These are useful for recovery/new machine onboarding even after initial setup.
+
+## Screenshot Automation (Windows)
+- Seed deterministic demo data:
+  - `scripts/windows/seed_demo_data.ps1`
+- Capture full screenshot catalog:
+  - `scripts/windows/run_screenshots.ps1`

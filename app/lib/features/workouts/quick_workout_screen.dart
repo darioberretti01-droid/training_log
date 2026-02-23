@@ -6,10 +6,7 @@ import '../../core/models/logged_set_input.dart';
 import '../../core/state/providers.dart';
 
 class QuickWorkoutScreen extends ConsumerStatefulWidget {
-  const QuickWorkoutScreen({
-    required this.exerciseId,
-    super.key,
-  });
+  const QuickWorkoutScreen({required this.exerciseId, super.key});
 
   final String exerciseId;
 
@@ -26,7 +23,7 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
   @override
   void initState() {
     super.initState();
-    _startedAt = DateTime.now();
+    _startedAt = ref.read(appClockProvider)();
     _setControllers = List.generate(3, (_) => _SetControllers());
   }
 
@@ -47,9 +44,7 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
         if (exercise == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Quick Log')),
-            body: const Center(
-              child: Text('Exercise not found.'),
-            ),
+            body: const Center(child: Text('Exercise not found.')),
           );
         }
 
@@ -119,14 +114,11 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
           ),
         );
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
         appBar: AppBar(title: const Text('Quick Log')),
-        body: Center(
-          child: Text('Failed to load exercise: $error'),
-        ),
+        body: Center(child: Text('Failed to load exercise: $error')),
       ),
     );
   }
@@ -154,10 +146,12 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
 
     setState(() => _isSaving = true);
     try {
-      await ref.read(quickWorkoutRepositoryProvider).saveQuickWorkout(
+      await ref
+          .read(quickWorkoutRepositoryProvider)
+          .saveQuickWorkout(
             exerciseId: widget.exerciseId,
             startedAt: _startedAt,
-            endedAt: DateTime.now(),
+            endedAt: ref.read(appClockProvider)(),
             sets: parsedSets,
           );
       if (!mounted) {
@@ -171,9 +165,9 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save workout: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save workout: $error')));
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -197,11 +191,15 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
       final rpe = rpeText.isEmpty ? null : double.tryParse(rpeText);
 
       if (reps == null || reps <= 0) {
-        _showValidationError('Set ${index + 1}: reps must be a positive integer.');
+        _showValidationError(
+          'Set ${index + 1}: reps must be a positive integer.',
+        );
         return null;
       }
       if (weight == null || weight <= 0) {
-        _showValidationError('Set ${index + 1}: weight must be a positive number.');
+        _showValidationError(
+          'Set ${index + 1}: weight must be a positive number.',
+        );
         return null;
       }
       if (restText.isNotEmpty && (rest == null || rest < 0)) {
@@ -357,12 +355,8 @@ class _NumberField extends StatelessWidget {
       onChanged: onChanged,
       keyboardType: TextInputType.numberWithOptions(decimal: decimal),
       inputFormatters: decimal
-          ? [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-            ]
-          : [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
+          ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]
+          : [FilteringTextInputFormatter.digitsOnly],
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -373,10 +367,10 @@ class _NumberField extends StatelessWidget {
 
 class _SetControllers {
   _SetControllers()
-      : repsController = TextEditingController(),
-        weightController = TextEditingController(),
-        restController = TextEditingController(),
-        rpeController = TextEditingController();
+    : repsController = TextEditingController(),
+      weightController = TextEditingController(),
+      restController = TextEditingController(),
+      rpeController = TextEditingController();
 
   final TextEditingController repsController;
   final TextEditingController weightController;

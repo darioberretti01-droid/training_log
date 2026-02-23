@@ -10,8 +10,11 @@ import '../../core/db/app_database.dart';
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/models/logged_set_input.dart';
 import '../../core/state/providers.dart';
+import '../../core/time/app_clock.dart';
 import '../splits/split_repository.dart';
 import 'quick_workout_repository.dart';
+import 'workout_draft.dart';
+import 'workout_draft_storage.dart';
 
 class WorkoutLoggerScreen extends ConsumerStatefulWidget {
   const WorkoutLoggerScreen({
@@ -32,29 +35,41 @@ class WorkoutLoggerScreen extends ConsumerStatefulWidget {
       _WorkoutLoggerScreenState();
 }
 
-class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
-  late final DateTime _startedAt;
+class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
+    with WidgetsBindingObserver {
+  late DateTime _startedAt;
   final List<_WorkoutExerciseState> _exercises = [];
   bool _didHydrateSplitDay = false;
   bool _isSaving = false;
+  bool _didSaveSession = false;
   bool _isOpeningPicker = false;
   int? _restSecondsRemaining;
   int _lastRestSeconds = 90;
   Timer? _restTimer;
+  bool _isInitializingDraft = true;
+  late AppClock _appClock;
+  late WorkoutDraftStorage _workoutDraftStorage;
+  late WorkoutDraftNotifier _workoutDraftNotifier;
+  WorkoutDraft? _inMemoryDraft;
 
   @override
   void initState() {
     super.initState();
-    _startedAt = DateTime.now();
-    if (widget.mode == WorkoutSessionMode.free && widget.openPickerOnStart) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handleAddExercise();
-      });
-    }
+    WidgetsBinding.instance.addObserver(this);
+    _appClock = ref.read(appClockProvider);
+    _workoutDraftStorage = ref.read(workoutDraftStorageProvider);
+    _workoutDraftNotifier = ref.read(workoutDraftProvider.notifier);
+    _inMemoryDraft = ref.read(workoutDraftProvider);
+    _startedAt = _appClock();
+    _initializeDraftState();
   }
 
   @override
   void dispose() {
+    if (!_didSaveSession) {
+      _saveDraftForResume();
+    }
+    WidgetsBinding.instance.removeObserver(this);
     _restTimer?.cancel();
     for (final exercise in _exercises) {
       exercise.dispose();
@@ -63,7 +78,23 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_didSaveSession) {
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _saveDraftForResume();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isInitializingDraft) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     if (widget.mode != WorkoutSessionMode.splitDay &&
         widget.mode != WorkoutSessionMode.free) {
       return Scaffold(
@@ -140,6 +171,13 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
       return;
     }
 
+    final matchingDraft = _matchingDraftOrNull();
+    if (matchingDraft != null && matchingDraft.exercises.isNotEmpty) {
+      _didHydrateSplitDay = true;
+      _hydrateFromDraft(matchingDraft);
+      return;
+    }
+
     _didHydrateSplitDay = true;
     for (final planned in day.plannedExercises) {
       final exercise = exerciseMap[planned.exerciseId];
@@ -159,94 +197,209 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
     }
   }
 
-  Scaffold _buildScaffold({
+  WorkoutDraft? _matchingDraftOrNull() {
+    final draft = _inMemoryDraft;
+    final now = _appClock();
+    if (draft == null || !draft.isForToday(now)) {
+      return null;
+    }
+    if (draft.mode != widget.mode) {
+      return null;
+    }
+    if (widget.mode == WorkoutSessionMode.splitDay) {
+      if (draft.splitId != widget.splitId ||
+          draft.dayIndex != widget.dayIndex) {
+        return null;
+      }
+    }
+    return draft;
+  }
+
+  Future<void> _initializeDraftState() async {
+    final storedDraft = await _workoutDraftStorage.loadDraft();
+    if (!mounted) {
+      return;
+    }
+    if (storedDraft != null) {
+      _setInMemoryDraft(storedDraft);
+      ref.invalidate(persistedWorkoutDraftProvider);
+    }
+
+    final matchingDraft = _matchingDraftOrNull();
+    if (matchingDraft != null &&
+        widget.mode == WorkoutSessionMode.free &&
+        matchingDraft.exercises.isNotEmpty) {
+      _hydrateFromDraft(matchingDraft);
+      _startedAt = DateTime.fromMillisecondsSinceEpoch(
+        matchingDraft.startedAtMs,
+      );
+    } else if (matchingDraft != null) {
+      _startedAt = DateTime.fromMillisecondsSinceEpoch(
+        matchingDraft.startedAtMs,
+      );
+    }
+
+    if (widget.mode == WorkoutSessionMode.free &&
+        widget.openPickerOnStart &&
+        _exercises.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleAddExercise();
+      });
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isInitializingDraft = false;
+    });
+  }
+
+  void _hydrateFromDraft(WorkoutDraft draft) {
+    if (_exercises.isNotEmpty) {
+      for (final exercise in _exercises) {
+        exercise.dispose();
+      }
+      _exercises.clear();
+    }
+
+    for (final exercise in draft.exercises) {
+      final restoredExercise = _WorkoutExerciseState(
+        exerciseId: exercise.exerciseId,
+        exerciseName: exercise.exerciseName,
+        labels: List<String>.from(exercise.labels),
+        repMin: exercise.repMin,
+        repMax: exercise.repMax,
+        targetSets: exercise.targetSets,
+        restSeconds: exercise.restSeconds,
+        targetRpe: exercise.targetRpe,
+      );
+      if (exercise.rows.isEmpty) {
+        restoredExercise.ensureInitialRows(exercise.targetSets);
+      } else {
+        for (final row in exercise.rows) {
+          restoredExercise.rows.add(
+            _WorkoutSetState(
+              weightText: row.weightText,
+              repsText: row.repsText,
+              rpeText: row.rpeText,
+              restSeconds: row.restSeconds,
+            ),
+          );
+        }
+      }
+      _exercises.add(restoredExercise);
+    }
+  }
+
+  Widget _buildScaffold({
     required String title,
     required String subtitle,
     required SplitDetails? splitDetails,
   }) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(24),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+    return PopScope(
+      canPop: !_isSaving,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop && !_didSaveSession) {
+          _saveDraftForResume();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(title),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(24),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
           ),
-        ),
-        actions: [
-          if (_restSecondsRemaining != null)
+          actions: [
+            if (_restSecondsRemaining != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Chip(
+                  label: Text(
+                    'Rest ${_formatRestTime(_restSecondsRemaining!)}',
+                  ),
+                ),
+              ),
+            if (widget.mode == WorkoutSessionMode.splitDay)
+              IconButton(
+                key: const Key('workout_logger_delete_log'),
+                tooltip: 'Delete current log',
+                onPressed: _isSaving ? null : _deleteCurrentLog,
+                icon: const Icon(Icons.delete_outline),
+              ),
             Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: Chip(
-                label: Text('Rest ${_formatRestTime(_restSecondsRemaining!)}'),
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton(
+                onPressed: _isSaving ? null : () => _onFinish(splitDetails),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Finish'),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilledButton(
-              onPressed: _isSaving ? null : () => _onFinish(splitDetails),
-              child: _isSaving
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Finish'),
-            ),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (widget.mode == WorkoutSessionMode.free) ...[
-            Row(
-              children: [
-                FilledButton.icon(
-                  key: const Key('workout_logger_add_exercise'),
-                  onPressed: _handleAddExercise,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add exercise'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
           ],
-          if (_exercises.isEmpty)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  widget.mode == WorkoutSessionMode.free
-                      ? 'No exercises yet. Add one to start logging sets.'
-                      : 'No planned exercises for this day.',
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (widget.mode == WorkoutSessionMode.free) ...[
+              Row(
+                children: [
+                  FilledButton.icon(
+                    key: const Key('workout_logger_add_exercise'),
+                    onPressed: _handleAddExercise,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add exercise'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_exercises.isEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    widget.mode == WorkoutSessionMode.free
+                        ? 'No exercises yet. Add one to start logging sets.'
+                        : 'No planned exercises for this day.',
+                  ),
+                ),
+              ),
+            ...List.generate(
+              _exercises.length,
+              (index) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ExerciseCard(
+                  key: Key('workout_exercise_card_$index'),
+                  exercise: _exercises[index],
+                  onSwap: widget.mode == WorkoutSessionMode.splitDay
+                      ? () => _handleSwapExercise(index)
+                      : null,
+                  onRemove: widget.mode == WorkoutSessionMode.free
+                      ? () => _removeExercise(index)
+                      : null,
+                  onEditPrescription: () => _editPrescription(index),
+                  onCopyPreviousSet: (rowIndex) =>
+                      _copyPreviousSet(index, rowIndex),
+                  onAddSet: () => _addSet(index),
+                  onDeleteSet: () => _deleteLastSet(index),
+                  onStartRestTimer: () => _startRestTimerForExercise(index),
                 ),
               ),
             ),
-          ...List.generate(
-            _exercises.length,
-            (index) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _ExerciseCard(
-                key: Key('workout_exercise_card_$index'),
-                exercise: _exercises[index],
-                onSwap: widget.mode == WorkoutSessionMode.splitDay
-                    ? () => _handleSwapExercise(index)
-                    : null,
-                onRemove: widget.mode == WorkoutSessionMode.free
-                    ? () => _removeExercise(index)
-                    : null,
-                onEditPrescription: () => _editPrescription(index),
-                onCopyPreviousSet: (rowIndex) =>
-                    _copyPreviousSet(index, rowIndex),
-                onAddSet: () => _addSet(index),
-                onCompletedChanged: (rowIndex, completed) =>
-                    _setCompleted(index, rowIndex, completed),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -460,40 +613,53 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
     });
   }
 
-  void _setCompleted(int exerciseIndex, int rowIndex, bool completed) {
+  Future<void> _deleteLastSet(int exerciseIndex) async {
     final exercise = _exercises[exerciseIndex];
-    final row = exercise.rows[rowIndex];
-    if (!completed) {
-      setState(() => row.isCompleted = false);
+    if (exercise.rows.length <= 1) {
+      _showMessage('At least one set is required.');
       return;
     }
 
-    final reps = int.tryParse(row.repsController.text.trim());
-    final weight = double.tryParse(row.weightController.text.trim());
-    final rpeText = row.rpeController.text.trim();
-    final rpe = rpeText.isEmpty ? null : double.tryParse(rpeText);
+    final lastRow = exercise.rows.last;
+    if (lastRow.hasAnyInput) {
+      final shouldDelete = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete last set?'),
+          content: const Text(
+            'The last set is already logged. Do you really want to delete it?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (shouldDelete != true) {
+        return;
+      }
+    }
 
-    if (reps == null || reps <= 0) {
-      _showMessage('Set ${rowIndex + 1}: reps must be a positive integer.');
-      return;
-    }
-    if (weight == null || weight <= 0) {
-      _showMessage('Set ${rowIndex + 1}: weight must be a positive number.');
-      return;
-    }
-    if (rpe != null && (rpe < 0 || rpe > 10)) {
-      _showMessage('Set ${rowIndex + 1}: RPE must be between 0 and 10.');
-      return;
-    }
+    final removed = exercise.rows.removeLast();
+    removed.dispose();
+    setState(() {});
+  }
 
-    final restSeconds = exercise.restSeconds ?? _lastRestSeconds;
-    _lastRestSeconds = restSeconds;
-    setState(() {
-      row
-        ..isCompleted = true
-        ..restSeconds = restSeconds;
-    });
-    _startRestTimer(restSeconds);
+  void _startRestTimerForExercise(int exerciseIndex) {
+    final exercise = _exercises[exerciseIndex];
+    final configuredRest = exercise.restSeconds;
+    final restSeconds = configuredRest == null || configuredRest <= 0
+        ? _lastRestSeconds
+        : configuredRest;
+    final normalized = restSeconds <= 0 ? 90 : restSeconds;
+    _lastRestSeconds = normalized;
+    _startRestTimer(normalized);
   }
 
   void _startRestTimer(int seconds) {
@@ -549,15 +715,21 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
           .saveWorkoutSession(
             mode: widget.mode,
             startedAt: _startedAt,
-            endedAt: DateTime.now(),
+            endedAt: ref.read(appClockProvider)(),
             splitId: splitId,
             dayIndex: dayIndex,
             sessionName: sessionName,
             exercises: sessionData.logs,
           );
 
+      _didSaveSession = true;
+      _clearInMemoryDraft();
+      ref.invalidate(persistedWorkoutDraftProvider);
+      await _workoutDraftStorage.clearDraft();
+
       ref.invalidate(recentHomeSessionsProvider);
       ref.invalidate(lastHomeSessionProvider);
+      ref.invalidate(lastSplitDaySessionProvider);
       ref.invalidate(suggestedWorkoutCardStateProvider);
 
       if (!mounted) {
@@ -582,60 +754,53 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
   _SessionPayload? _buildSessionPayload() {
     final logs = <WorkoutExerciseLogInput>[];
     var totalSets = 0;
-    var totalVolume = 0.0;
+    var unfilledSets = 0;
 
     for (final exercise in _exercises) {
-      final completed = <LoggedSetInput>[];
+      final loggedSets = <LoggedSetInput>[];
       for (final row in exercise.rows) {
-        if (!row.isCompleted) {
+        if (!row.hasAnyInput) {
+          unfilledSets += 1;
           continue;
         }
-        final reps = int.tryParse(row.repsController.text.trim());
-        final weight = double.tryParse(row.weightController.text.trim());
-        final rpeText = row.rpeController.text.trim();
-        final rpe = rpeText.isEmpty ? null : double.tryParse(rpeText);
-        if (reps == null || reps <= 0 || weight == null || weight <= 0) {
-          _showMessage(
-            '${exercise.exerciseName}: completed sets must have valid reps and weight.',
-          );
-          return null;
+
+        if (!row.isLoggedSet) {
+          unfilledSets += 1;
+          continue;
         }
-        if (rpe != null && (rpe < 0 || rpe > 10)) {
-          _showMessage(
-            '${exercise.exerciseName}: RPE must be between 0 and 10.',
-          );
-          return null;
-        }
-        completed.add(
+
+        final reps = row.repsValue!;
+        final weight = row.weightValue!;
+        final rpe = row.rpeValue;
+        loggedSets.add(
           LoggedSetInput(
             reps: reps,
             weightKg: weight,
-            restSeconds: row.restSeconds,
+            restSeconds: row.restSeconds ?? exercise.restSeconds,
             rpe: rpe,
           ),
         );
         totalSets += 1;
-        totalVolume += reps * weight;
       }
 
-      if (completed.isNotEmpty) {
+      if (loggedSets.isNotEmpty) {
         logs.add(
           WorkoutExerciseLogInput(
             exerciseId: exercise.exerciseId,
-            sets: completed,
+            sets: loggedSets,
           ),
         );
       }
     }
 
     if (logs.isEmpty || totalSets == 0) {
-      _showMessage('Complete at least one set before finishing.');
+      _showMessage('Log at least one complete set before finishing.');
       return null;
     }
     return _SessionPayload(
       logs: logs,
       totalSets: totalSets,
-      totalVolume: totalVolume,
+      unfilledSetCount: unfilledSets,
     );
   }
 
@@ -657,7 +822,16 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
               const SizedBox(height: 10),
               Text('${sessionData.logs.length} exercises'),
               Text('${sessionData.totalSets} total sets'),
-              Text('~${sessionData.totalVolume.toStringAsFixed(1)} kg volume'),
+              if (sessionData.unfilledSetCount > 0) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '${sessionData.unfilledSetCount} unfilled sets will not be counted. Save anyway?',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.tertiary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -690,6 +864,114 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen> {
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
+
+  Future<void> _deleteCurrentLog() async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete current log?'),
+        content: const Text(
+          'This will clear your in-progress workout. You can start again from Home.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (shouldDelete != true) {
+      return;
+    }
+
+    _clearInMemoryDraft();
+    ref.invalidate(persistedWorkoutDraftProvider);
+    await _workoutDraftStorage.clearDraft();
+
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('In-progress log deleted.')));
+    context.go('/home');
+  }
+
+  void _saveDraftForResume() {
+    final hasAnySetInput = _exercises.any(
+      (exercise) => exercise.rows.any((row) => row.hasAnyInput),
+    );
+    final hasFreeExerciseSelection =
+        widget.mode == WorkoutSessionMode.free && _exercises.isNotEmpty;
+    if (!hasAnySetInput && !hasFreeExerciseSelection) {
+      final existingDraft = _inMemoryDraft;
+      final matchesCurrent =
+          existingDraft?.matchesLoggerContext(
+            mode: widget.mode,
+            splitId: widget.splitId,
+            dayIndex: widget.dayIndex,
+          ) ??
+          false;
+      if (matchesCurrent) {
+        _clearInMemoryDraft();
+        unawaited(_workoutDraftStorage.clearDraft());
+      }
+      return;
+    }
+
+    final draft = WorkoutDraft(
+      mode: widget.mode,
+      splitId: widget.mode == WorkoutSessionMode.splitDay
+          ? widget.splitId
+          : null,
+      dayIndex: widget.mode == WorkoutSessionMode.splitDay
+          ? widget.dayIndex
+          : null,
+      startedAtMs: _startedAt.millisecondsSinceEpoch,
+      updatedAtMs: _appClock().millisecondsSinceEpoch,
+      exercises: _exercises
+          .map(
+            (exercise) => WorkoutDraftExercise(
+              exerciseId: exercise.exerciseId,
+              exerciseName: exercise.exerciseName,
+              labels: List<String>.from(exercise.labels),
+              repMin: exercise.repMin,
+              repMax: exercise.repMax,
+              targetSets: exercise.targetSets,
+              restSeconds: exercise.restSeconds,
+              targetRpe: exercise.targetRpe,
+              rows: exercise.rows
+                  .map(
+                    (row) => WorkoutDraftSetRow(
+                      weightText: row.weightController.text.trim(),
+                      repsText: row.repsController.text.trim(),
+                      rpeText: row.rpeController.text.trim(),
+                      restSeconds: row.restSeconds,
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          )
+          .toList(growable: false),
+    );
+    _setInMemoryDraft(draft);
+    unawaited(_workoutDraftStorage.saveDraft(draft));
+  }
+
+  void _setInMemoryDraft(WorkoutDraft draft) {
+    _inMemoryDraft = draft;
+    _workoutDraftNotifier.setDraft(draft);
+  }
+
+  void _clearInMemoryDraft() {
+    _inMemoryDraft = null;
+    _workoutDraftNotifier.clearDraft();
+  }
 }
 
 class _ExerciseCard extends ConsumerWidget {
@@ -698,7 +980,8 @@ class _ExerciseCard extends ConsumerWidget {
     required this.onEditPrescription,
     required this.onCopyPreviousSet,
     required this.onAddSet,
-    required this.onCompletedChanged,
+    required this.onDeleteSet,
+    required this.onStartRestTimer,
     this.onSwap,
     this.onRemove,
     super.key,
@@ -710,7 +993,8 @@ class _ExerciseCard extends ConsumerWidget {
   final VoidCallback onEditPrescription;
   final void Function(int rowIndex) onCopyPreviousSet;
   final VoidCallback onAddSet;
-  final void Function(int rowIndex, bool completed) onCompletedChanged;
+  final VoidCallback onDeleteSet;
+  final VoidCallback onStartRestTimer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -792,15 +1076,33 @@ class _ExerciseCard extends ConsumerWidget {
                 onCopyPrevious: rowIndex > 0
                     ? () => onCopyPreviousSet(rowIndex)
                     : null,
-                onCompletedChanged: (value) =>
-                    onCompletedChanged(rowIndex, value ?? false),
               ),
             ),
             const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onAddSet,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add set'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onDeleteSet,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Delete set'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: onAddSet,
-              icon: const Icon(Icons.add),
-              label: const Text('+ Add set'),
+              onPressed: onStartRestTimer,
+              icon: const Icon(Icons.timer_outlined),
+              label: const Text('Start rest timer'),
             ),
             if (showProgressHint)
               Padding(
@@ -820,15 +1122,13 @@ class _ExerciseCard extends ConsumerWidget {
   }
 
   bool _shouldShowProgressHint(_WorkoutExerciseState exercise) {
-    final completedRows = exercise.rows
-        .where((row) => row.isCompleted)
-        .toList();
-    if (completedRows.isEmpty) {
+    final loggedRows = exercise.rows.where((row) => row.isLoggedSet).toList();
+    if (loggedRows.isEmpty) {
       return false;
     }
 
-    for (final row in completedRows) {
-      final reps = int.tryParse(row.repsController.text.trim());
+    for (final row in loggedRows) {
+      final reps = row.repsValue;
       if (reps == null || reps < exercise.repMax) {
         return false;
       }
@@ -883,20 +1183,18 @@ class _SetRow extends StatelessWidget {
     required this.setNumber,
     required this.row,
     required this.repMin,
-    required this.onCompletedChanged,
     this.onCopyPrevious,
   });
 
   final int setNumber;
   final _WorkoutSetState row;
   final int repMin;
-  final ValueChanged<bool?> onCompletedChanged;
   final VoidCallback? onCopyPrevious;
 
   @override
   Widget build(BuildContext context) {
-    final reps = int.tryParse(row.repsController.text.trim());
-    final belowRangeHint = row.isCompleted && reps != null && reps < repMin;
+    final reps = row.repsValue;
+    final belowRangeHint = row.isLoggedSet && reps != null && reps < repMin;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -941,7 +1239,6 @@ class _SetRow extends StatelessWidget {
                   onPressed: onCopyPrevious,
                   icon: const Icon(Icons.content_copy_outlined),
                 ),
-              Checkbox(value: row.isCompleted, onChanged: onCompletedChanged),
             ],
           ),
           if (belowRangeHint)
@@ -1145,16 +1442,68 @@ class _WorkoutExerciseState {
 }
 
 class _WorkoutSetState {
-  _WorkoutSetState({String? weightText, String? repsText, String? rpeText})
-    : weightController = TextEditingController(text: weightText ?? ''),
-      repsController = TextEditingController(text: repsText ?? ''),
-      rpeController = TextEditingController(text: rpeText ?? '');
+  _WorkoutSetState({
+    String? weightText,
+    String? repsText,
+    String? rpeText,
+    this.restSeconds,
+  }) : weightController = TextEditingController(text: weightText ?? ''),
+       repsController = TextEditingController(text: repsText ?? ''),
+       rpeController = TextEditingController(text: rpeText ?? '');
 
   final TextEditingController weightController;
   final TextEditingController repsController;
   final TextEditingController rpeController;
-  bool isCompleted = false;
   int? restSeconds;
+
+  bool get hasAnyInput =>
+      weightController.text.trim().isNotEmpty ||
+      repsController.text.trim().isNotEmpty ||
+      rpeController.text.trim().isNotEmpty;
+
+  int? get repsValue {
+    final raw = repsController.text.trim();
+    if (raw.isEmpty) {
+      return null;
+    }
+    return int.tryParse(raw);
+  }
+
+  double? get weightValue {
+    final raw = weightController.text.trim();
+    if (raw.isEmpty) {
+      return null;
+    }
+    return double.tryParse(raw);
+  }
+
+  double? get rpeValue {
+    final raw = rpeController.text.trim();
+    if (raw.isEmpty) {
+      return null;
+    }
+    return double.tryParse(raw);
+  }
+
+  bool get isLoggedSet {
+    if (!hasAnyInput) {
+      return false;
+    }
+    final reps = repsValue;
+    final weight = weightValue;
+    if (reps == null || reps <= 0 || weight == null || weight <= 0) {
+      return false;
+    }
+    final rawRpe = rpeController.text.trim();
+    if (rawRpe.isEmpty) {
+      return true;
+    }
+    final rpe = rpeValue;
+    if (rpe == null) {
+      return false;
+    }
+    return rpe >= 0 && rpe <= 10;
+  }
 
   void dispose() {
     weightController.dispose();
@@ -1167,10 +1516,10 @@ class _SessionPayload {
   const _SessionPayload({
     required this.logs,
     required this.totalSets,
-    required this.totalVolume,
+    required this.unfilledSetCount,
   });
 
   final List<WorkoutExerciseLogInput> logs;
   final int totalSets;
-  final double totalVolume;
+  final int unfilledSetCount;
 }

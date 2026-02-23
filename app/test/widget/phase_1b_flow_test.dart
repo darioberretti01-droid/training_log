@@ -123,6 +123,21 @@ class _FakeQuickWorkoutRepository implements QuickWorkoutRepository {
   }) async => null;
 
   @override
+  Future<WorkoutSessionDetails?> getSessionDetails(String sessionId) async =>
+      null;
+
+  @override
+  Future<void> updateWorkoutSession({
+    required String sessionId,
+    required DateTime endedAt,
+    required List<WorkoutExerciseLogInput> exercises,
+    String? sessionName,
+  }) async {}
+
+  @override
+  Future<void> deleteWorkoutSession(String sessionId) async {}
+
+  @override
   Future<String> saveQuickWorkout({
     required String exerciseId,
     required DateTime startedAt,

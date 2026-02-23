@@ -1,0 +1,1 @@
+typedef AppClock = DateTime Function();

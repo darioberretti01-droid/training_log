@@ -167,4 +167,82 @@ void main() {
     expect(session.dayIndex, 1);
     expect(session.sessionName, 'Upper');
   });
+
+  test('updateWorkoutSession rewrites session sets and metadata', () async {
+    await exerciseRepository.seedIfEmpty();
+    final exercises = await exerciseRepository.watchExercises().first;
+
+    final sessionId = await workoutRepository.saveWorkoutSession(
+      mode: WorkoutSessionMode.free,
+      startedAt: DateTime(2026, 2, 23, 9, 0),
+      endedAt: DateTime(2026, 2, 23, 9, 20),
+      sessionName: 'Free workout',
+      exercises: [
+        WorkoutExerciseLogInput(
+          exerciseId: exercises[0].id,
+          sets: const [LoggedSetInput(reps: 8, weightKg: 60)],
+        ),
+      ],
+    );
+
+    await workoutRepository.updateWorkoutSession(
+      sessionId: sessionId,
+      endedAt: DateTime(2026, 2, 23, 9, 35),
+      sessionName: 'Edited session',
+      exercises: [
+        WorkoutExerciseLogInput(
+          exerciseId: exercises[0].id,
+          sets: const [
+            LoggedSetInput(reps: 10, weightKg: 62.5),
+            LoggedSetInput(reps: 8, weightKg: 65),
+          ],
+        ),
+      ],
+    );
+
+    final session = await (database.select(
+      database.workoutSessions,
+    )..where((tbl) => tbl.id.equals(sessionId))).getSingle();
+    final sets = await (database.select(
+      database.performedSets,
+    )..where((tbl) => tbl.sessionId.equals(sessionId))).get();
+
+    expect(session.sessionName, 'Edited session');
+    expect(
+      session.endedAt,
+      DateTime(2026, 2, 23, 9, 35).millisecondsSinceEpoch,
+    );
+    expect(sets, hasLength(2));
+    expect(sets.first.reps, 10);
+    expect(sets.first.weightKg, 62.5);
+  });
+
+  test('deleteWorkoutSession removes session and sets', () async {
+    await exerciseRepository.seedIfEmpty();
+    final exercises = await exerciseRepository.watchExercises().first;
+
+    final sessionId = await workoutRepository.saveWorkoutSession(
+      mode: WorkoutSessionMode.free,
+      startedAt: DateTime(2026, 2, 23, 11, 0),
+      endedAt: DateTime(2026, 2, 23, 11, 20),
+      exercises: [
+        WorkoutExerciseLogInput(
+          exerciseId: exercises[0].id,
+          sets: const [LoggedSetInput(reps: 8, weightKg: 50)],
+        ),
+      ],
+    );
+
+    await workoutRepository.deleteWorkoutSession(sessionId);
+
+    final session = await (database.select(
+      database.workoutSessions,
+    )..where((tbl) => tbl.id.equals(sessionId))).getSingleOrNull();
+    final sets = await (database.select(
+      database.performedSets,
+    )..where((tbl) => tbl.sessionId.equals(sessionId))).get();
+
+    expect(session, isNull);
+    expect(sets, isEmpty);
+  });
 }

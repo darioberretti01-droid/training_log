@@ -30,13 +30,12 @@ void main() {
           exerciseLogCountMapProvider.overrideWith(
             (ref) => Stream.value(const {'bench_press': 0}),
           ),
+          splitsProvider.overrideWith((ref) => Stream.value(const [])),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
           lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
           suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
           activeSplitDetailsProvider.overrideWith((ref) async => null),
-          activeSplitProvider.overrideWith(
-            (ref) => const AsyncValue.data(null),
-          ),
         ],
         child: const TrainingLogApp(),
       ),

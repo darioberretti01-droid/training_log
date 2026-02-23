@@ -11,6 +11,7 @@ import '../features/splits/split_builder_screen.dart';
 import '../features/splits/split_detail_screen.dart';
 import '../features/splits/splits_screen.dart';
 import '../features/workouts/quick_workout_screen.dart';
+import '../features/workouts/session_detail_screen.dart';
 import '../features/workouts/workout_logger_screen.dart';
 import 'root_shell.dart';
 
@@ -42,6 +43,13 @@ final appRouter = GoRouter(
               dayIndex: dayIndex,
               openPickerOnStart: openPicker,
             );
+          },
+        ),
+        GoRoute(
+          path: '/sessions/:sessionId',
+          builder: (context, state) {
+            final sessionId = state.pathParameters['sessionId']!;
+            return SessionDetailScreen(sessionId: sessionId);
           },
         ),
         GoRoute(

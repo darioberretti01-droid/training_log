@@ -25,6 +25,20 @@ class SuggestedWorkoutCardState {
   final HomeSessionOverviewEntry? lastSessionSummary;
 }
 
+class HomeSplitRecoveryState {
+  const HomeSplitRecoveryState({
+    required this.lastUsedSplitId,
+    required this.lastUsedSplitName,
+    required this.canRestoreLastUsedSplit,
+    required this.wasLastUsedSplitDeleted,
+  });
+
+  final String lastUsedSplitId;
+  final String? lastUsedSplitName;
+  final bool canRestoreLastUsedSplit;
+  final bool wasLastUsedSplitDeleted;
+}
+
 Future<SplitDetails?> getActiveSplit(SplitRepository splitRepository) async {
   final splits = await splitRepository.watchSplits().first;
   final activeSummary = splits.firstWhereOrNull((split) => split.isActive);
@@ -45,6 +59,33 @@ Future<HomeSessionOverviewEntry?> getLastSession(
     );
   }
   return workoutRepository.getLastSession();
+}
+
+HomeSplitRecoveryState? getHomeSplitRecoveryState({
+  required List<SplitSummary> splits,
+  required SplitSummary? activeSplit,
+  required HomeSessionOverviewEntry? lastSplitDaySession,
+}) {
+  final lastUsedSplitId = lastSplitDaySession?.splitId?.trim();
+  if (lastUsedSplitId == null || lastUsedSplitId.isEmpty) {
+    return null;
+  }
+
+  final activeSplitId = activeSplit?.id;
+  if (activeSplitId == lastUsedSplitId) {
+    return null;
+  }
+
+  final lastUsedSplit = splits.firstWhereOrNull(
+    (split) => split.id == lastUsedSplitId,
+  );
+
+  return HomeSplitRecoveryState(
+    lastUsedSplitId: lastUsedSplitId,
+    lastUsedSplitName: lastUsedSplit?.name,
+    canRestoreLastUsedSplit: lastUsedSplit != null,
+    wasLastUsedSplitDeleted: lastUsedSplit == null,
+  );
 }
 
 int getNextDayIndexSequence(
@@ -70,19 +111,14 @@ int getNextDayIndexSequence(
   return split.days.first.dayIndex;
 }
 
-Future<SuggestedWorkoutCardState?> getSuggestedWorkoutCardState({
-  required SplitRepository splitRepository,
-  required QuickWorkoutRepository workoutRepository,
-}) async {
-  final activeSplit = await getActiveSplit(splitRepository);
-  if (activeSplit == null || activeSplit.days.isEmpty) {
+SuggestedWorkoutCardState? buildSuggestedWorkoutCardState({
+  required SplitDetails activeSplit,
+  required HomeSessionOverviewEntry? lastSession,
+}) {
+  if (activeSplit.days.isEmpty) {
     return null;
   }
 
-  final lastSession = await getLastSession(
-    workoutRepository,
-    activeSplitId: activeSplit.id,
-  );
   final nextDayIndex = getNextDayIndexSequence(activeSplit, lastSession);
   final nextDay =
       activeSplit.days.firstWhereOrNull(
@@ -104,6 +140,25 @@ Future<SuggestedWorkoutCardState?> getSuggestedWorkoutCardState({
         .take(3)
         .toList(growable: false),
     lastSessionSummary: lastSession,
+  );
+}
+
+Future<SuggestedWorkoutCardState?> getSuggestedWorkoutCardState({
+  required SplitRepository splitRepository,
+  required QuickWorkoutRepository workoutRepository,
+}) async {
+  final activeSplit = await getActiveSplit(splitRepository);
+  if (activeSplit == null || activeSplit.days.isEmpty) {
+    return null;
+  }
+
+  final lastSession = await getLastSession(
+    workoutRepository,
+    activeSplitId: activeSplit.id,
+  );
+  return buildSuggestedWorkoutCardState(
+    activeSplit: activeSplit,
+    lastSession: lastSession,
   );
 }
 

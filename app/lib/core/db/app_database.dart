@@ -206,6 +206,13 @@ class AppDatabase extends _$AppDatabase {
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
+      await customStatement(
+        'CREATE TABLE IF NOT EXISTS workout_drafts ('
+        'id TEXT PRIMARY KEY, '
+        'payload TEXT NOT NULL, '
+        'updated_at INTEGER NOT NULL'
+        ')',
+      );
     },
   );
 }

@@ -20,6 +20,7 @@ void main() {
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
           lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
           suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
           activeSplitDetailsProvider.overrideWith((ref) async => null),
           activeSplitProvider.overrideWith(
@@ -60,6 +61,7 @@ void main() {
             ]),
           ),
           lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
           suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
           activeSplitDetailsProvider.overrideWith((ref) async => null),
           activeSplitProvider.overrideWith(
@@ -89,6 +91,7 @@ void main() {
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
           lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
           suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
           activeSplitDetailsProvider.overrideWith((ref) async => null),
           activeSplitProvider.overrideWith(
@@ -126,6 +129,7 @@ void main() {
           splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
           lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
           suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
           activeSplitDetailsProvider.overrideWith((ref) async => null),
           activeSplitProvider.overrideWith(
@@ -192,6 +196,7 @@ void main() {
           splitRepositoryProvider.overrideWithValue(repository),
           recentHomeSessionsProvider.overrideWith((ref) async => const []),
           lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
           suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
           activeSplitDetailsProvider.overrideWith((ref) async => null),
           activeSplitProvider.overrideWith(
