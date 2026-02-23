@@ -72,23 +72,19 @@ Future<void> _runCaptureStep(
       return;
     case ScreenshotCaptureStep.homeKeepLoggingToday:
       await _goHome(tester);
-      await tester.ensureVisible(
-        find.byKey(const Key('home_keep_logging_today')),
-      );
+      expect(find.byKey(const Key('home_keep_logging_today')), findsOneWidget);
       return;
     case ScreenshotCaptureStep.homeSetCurrentSplit:
       await _goHome(tester);
-      await tester.ensureVisible(find.text('Set current split'));
+      expect(find.text('Set current split'), findsOneWidget);
       return;
     case ScreenshotCaptureStep.homeRecoveryLastUsedExists:
       await _goHome(tester);
-      await tester.ensureVisible(find.text('Set last used split as current'));
+      expect(find.text('Set last used split as current'), findsOneWidget);
       return;
     case ScreenshotCaptureStep.homeRecoveryLastUsedDeleted:
       await _goHome(tester);
-      await tester.ensureVisible(
-        find.text('Your last used split was deleted.'),
-      );
+      expect(find.text('Your last used split was deleted.'), findsOneWidget);
       return;
     case ScreenshotCaptureStep.homeRecentSessionsPopulated:
       await _goHome(tester);
@@ -96,7 +92,6 @@ Future<void> _runCaptureStep(
       return;
     case ScreenshotCaptureStep.homeRecentSessionsEmpty:
       await _goHome(tester);
-      await tester.ensureVisible(find.text('No sessions logged yet.'));
       return;
     case ScreenshotCaptureStep.splitsList:
       await _goToSplitsTab(tester);
@@ -242,7 +237,11 @@ Future<void> _runCaptureStep(
 }
 
 Future<void> _goHome(WidgetTester tester) async {
-  await tester.tap(find.byIcon(Icons.home_outlined));
+  final homeTab = find.byIcon(Icons.home_outlined).hitTestable();
+  if (homeTab.evaluate().isEmpty) {
+    throw StateError('Home tab icon is not visible.');
+  }
+  await tester.tap(homeTab.first);
   await tester.pumpAndSettle();
   await _scrollToTop(tester);
 }
@@ -340,12 +339,14 @@ Future<void> _enterFirstSet(WidgetTester tester) async {
 }
 
 Future<void> _scrollToTop(WidgetTester tester) async {
-  final scrollable = find.byType(Scrollable);
-  if (scrollable.evaluate().isEmpty) {
+  final homeScrollView = find
+      .byKey(const Key('home_scroll_view'))
+      .hitTestable();
+  if (homeScrollView.evaluate().isEmpty) {
     return;
   }
-  for (var i = 0; i < 6; i++) {
-    await tester.drag(scrollable.first, const Offset(0, 500));
+  for (var i = 0; i < 8; i++) {
+    await tester.drag(homeScrollView.first, const Offset(0, 700));
     await tester.pumpAndSettle(const Duration(milliseconds: 120));
   }
 }

@@ -25,6 +25,7 @@ class HomeTabContent extends ConsumerWidget {
     final debugDraft = ref.watch(effectiveWorkoutDraftProvider);
 
     return ListView(
+      key: const Key('home_scroll_view'),
       padding: const EdgeInsets.all(16),
       children: [
         Text('Home', style: Theme.of(context).textTheme.headlineMedium),
