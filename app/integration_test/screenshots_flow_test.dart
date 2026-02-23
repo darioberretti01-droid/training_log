@@ -53,7 +53,7 @@ void main() {
         );
         await tester.pumpAndSettle(const Duration(seconds: 2));
 
-        await _runCaptureStep(tester, entry.captureStep);
+        await _runCaptureStep(tester, container, entry.captureStep);
         await tester.pumpAndSettle(const Duration(milliseconds: 600));
         await binding.takeScreenshot(entry.id);
       },
@@ -63,6 +63,7 @@ void main() {
 
 Future<void> _runCaptureStep(
   WidgetTester tester,
+  ProviderContainer container,
   ScreenshotCaptureStep step,
 ) async {
   switch (step) {
@@ -160,6 +161,13 @@ Future<void> _runCaptureStep(
       }
       await tester.pumpAndSettle();
       return;
+    case ScreenshotCaptureStep.loggerExercisePickerOpen:
+      await _goHome(tester);
+      await tester.tap(find.byKey(const Key('home_free_workout')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('workout_logger_add_exercise')));
+      await tester.pumpAndSettle();
+      return;
     case ScreenshotCaptureStep.loggerFinishUnfilledWarning:
       await _goHome(tester);
       await tester.tap(find.byKey(const Key('home_log_current_split')));
@@ -168,19 +176,67 @@ Future<void> _runCaptureStep(
       await tester.tap(find.widgetWithText(FilledButton, 'Finish'));
       await tester.pumpAndSettle();
       return;
-    case ScreenshotCaptureStep.sessionOverviewEditable:
+    case ScreenshotCaptureStep.loggerDeleteCurrentLogConfirmDialog:
       await _goHome(tester);
-      final recentSessionFinder = find.byWidgetPredicate((widget) {
-        if (widget is ListTile && widget.key is Key) {
-          final key = widget.key!;
-          return key.toString().contains('home_recent_session_');
-        }
-        return false;
-      });
-      if (recentSessionFinder.evaluate().isNotEmpty) {
-        await tester.tap(recentSessionFinder.first);
-        await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('home_log_current_split')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('workout_logger_delete_log')));
+      await tester.pumpAndSettle();
+      return;
+    case ScreenshotCaptureStep.sessionOverviewEditable:
+      await _openRecentSessionFromHome(tester);
+      return;
+    case ScreenshotCaptureStep.sessionOverviewDeleteConfirmDialog:
+      await _openRecentSessionFromHome(tester);
+      await tester.tap(find.byKey(const Key('session_detail_delete')));
+      await tester.pumpAndSettle();
+      return;
+    case ScreenshotCaptureStep.splitBuilderExercisePickerOpen:
+      await _goToSplitsTab(tester);
+      await tester.tap(find.byKey(const Key('splits_add_button')));
+      await tester.pumpAndSettle();
+      final dayExerciseDropdown = find.byKey(const Key('day_1_exercise_1'));
+      await tester.ensureVisible(dayExerciseDropdown.first);
+      await tester.tap(dayExerciseDropdown.first, warnIfMissed: false);
+      await tester.pumpAndSettle();
+      return;
+    case ScreenshotCaptureStep.exercisesDeleteModeActive:
+      await _goToExercisesTab(tester);
+      await _enterExercisesDeleteMode(tester);
+      return;
+    case ScreenshotCaptureStep.exercisesHideStandardConfirmDialog:
+      await _goToExercisesTab(tester);
+      await _enterExercisesDeleteMode(tester);
+      final hideButton = _finderByKeyContains('exercise_hide_');
+      if (hideButton.evaluate().isEmpty) {
+        throw StateError('No standard exercise hide button found.');
       }
+      await tester.ensureVisible(hideButton.first);
+      await tester.tap(hideButton.first);
+      await tester.pumpAndSettle();
+      return;
+    case ScreenshotCaptureStep.exercisesRestoreStandardConfirmDialog:
+      await container
+          .read(exerciseRepositoryProvider)
+          .hideStandardExercise('back_squat');
+      await _goToExercisesTab(tester);
+      final hiddenToggle = find.byKey(
+        const Key('exercises_toggle_hidden_button'),
+      );
+      if (hiddenToggle.evaluate().isEmpty) {
+        throw StateError('Hidden exercises toggle button not found.');
+      }
+      await tester.ensureVisible(hiddenToggle.first);
+      await tester.tap(hiddenToggle.first);
+      await tester.pumpAndSettle();
+      await _enterExercisesDeleteMode(tester);
+      final restoreButton = find.widgetWithText(OutlinedButton, 'RESTORE');
+      if (restoreButton.evaluate().isEmpty) {
+        throw StateError('No hidden standard exercise restore button found.');
+      }
+      await tester.ensureVisible(restoreButton.first);
+      await tester.tap(restoreButton.first);
+      await tester.pumpAndSettle();
       return;
   }
 }
@@ -188,6 +244,7 @@ Future<void> _runCaptureStep(
 Future<void> _goHome(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.home_outlined));
   await tester.pumpAndSettle();
+  await _scrollToTop(tester);
 }
 
 Future<void> _goToSplitsTab(WidgetTester tester) async {
@@ -233,6 +290,45 @@ Future<void> _openExerciseHistory(WidgetTester tester) async {
   throw StateError('Could not find any exercise item to open history.');
 }
 
+Future<void> _openRecentSessionFromHome(WidgetTester tester) async {
+  await _goHome(tester);
+  final recentSessionFinder = find.byWidgetPredicate((widget) {
+    if (widget is ListTile && widget.key is Key) {
+      final key = widget.key!;
+      return key.toString().contains('home_recent_session_');
+    }
+    return false;
+  });
+  if (recentSessionFinder.evaluate().isEmpty) {
+    throw StateError('No recent session card found on Home.');
+  }
+  await tester.tap(recentSessionFinder.first);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _enterExercisesDeleteMode(WidgetTester tester) async {
+  final listToggle = find.descendant(
+    of: find.byKey(const Key('exercises_view_toggle')),
+    matching: find.byIcon(Icons.view_list_outlined),
+  );
+  if (listToggle.evaluate().isNotEmpty) {
+    await tester.tap(listToggle.first);
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(find.byKey(const Key('exercises_delete_mode_button')));
+  await tester.pumpAndSettle();
+}
+
+Finder _finderByKeyContains(String token) {
+  return find.byWidgetPredicate((widget) {
+    final key = widget.key;
+    if (key == null) {
+      return false;
+    }
+    return key.toString().contains(token);
+  });
+}
+
 Future<void> _enterFirstSet(WidgetTester tester) async {
   final fields = find.byType(TextField);
   if (fields.evaluate().length < 2) {
@@ -241,4 +337,15 @@ Future<void> _enterFirstSet(WidgetTester tester) async {
   await tester.enterText(fields.at(0), '82.5');
   await tester.enterText(fields.at(1), '8');
   await tester.pumpAndSettle();
+}
+
+Future<void> _scrollToTop(WidgetTester tester) async {
+  final scrollable = find.byType(Scrollable);
+  if (scrollable.evaluate().isEmpty) {
+    return;
+  }
+  for (var i = 0; i < 6; i++) {
+    await tester.drag(scrollable.first, const Offset(0, 500));
+    await tester.pumpAndSettle(const Duration(milliseconds: 120));
+  }
 }
