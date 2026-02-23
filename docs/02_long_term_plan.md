@@ -2,7 +2,7 @@
 
 This document tracks the product roadmap and current status.
 
-## Current Status (as of 2026-02-22)
+## Current Status (as of 2026-02-23)
 - Environment setup complete (Flutter + Android toolchain verified).
 - Phase 1A implemented:
   - local DB schema (exercises, labels, sessions, performed sets)
@@ -49,6 +49,16 @@ This document tracks the product roadmap and current status.
     - full muscle-volume overview in split builder/edit with selectable control labels
     - lightweight muscle-volume summary in split detail view
   - standard label set expanded with: `glutes`, `forearms`, `back`, `abs`
+- Phase 2 advanced implementation delivered:
+  - Home v2 "Next workout" card with sequence-based split-day suggestion
+  - split-recovery states when last-used split is missing or not current
+  - split-day and free-workout logger modes in a unified workout logger screen
+  - session overview/edit/delete screen from Home recent sessions
+  - persistent draft resume flow (`Keep logging today's workout`)
+- Tooling foundation delivered:
+  - deterministic fixture service (base + overlays) for repeatable states
+  - debug tools in `Other` for reset/seed
+  - integration screenshot catalog capture + validation + generated index docs
 
 ## Roadmap
 
@@ -90,9 +100,9 @@ Phase 1B (in progress):
   - control-label based split volume tracking with default muscles:
     - chest, back, shoulders, biceps, triceps, quads, glutes, hamstrings
 - next:
-  - launch workout from day plan
-  - workout screen references: last / best-in-split / best all-time
-  - connect home quick actions to actual workout flows (currently placeholders)
+  - refine logger speed UX and progression hints
+  - optional exercise swap quality improvements in split-day mode
+  - stabilize and expand session editing coverage
 
 ### Phase 3 - Progression and Warnings (v1.1)
 - increase-load suggestion when prior range was saturated
@@ -106,6 +116,7 @@ Phase 1B (in progress):
   - last completed workout
   - split sequence
   - skipped days / extra workouts
+- optionally weekday mode (`schedule_mode=weekday`) when scheduling UI is introduced
 - tests for today/next selection logic
 
 ### Phase 5 - Advanced Features (post-MVP)

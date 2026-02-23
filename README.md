@@ -1,67 +1,70 @@
 # Training Log App
 
-Beginner-first Flutter project for a smartphone training log.
+Flutter training log app with split-day logging, free workout logging, and deterministic screenshot automation.
 
-## Quick Start (Run From GitHub)
-1. Clone the repository:
+## Quick Start
+1. Clone repository:
    - `git clone https://github.com/darioberretti01-droid/training_log.git`
    - `cd training_log`
-2. Enter the Flutter app folder:
+2. Open app folder:
    - `cd app`
-3. Install dependencies:
+3. Install deps:
    - `flutter pub get`
-4. Verify setup:
-   - `flutter doctor`
-5. Run checks:
+4. Run checks:
    - `flutter analyze`
    - `flutter test`
-6. Start the app (Android emulator/device):
-   - `flutter emulators --launch Medium_Phone_API_36.1` (if needed)
+5. Run app on Android emulator:
    - `flutter run -d emulator-5554`
 
-## Project Status
-- Core logging flow is implemented and test-covered.
-- Split planning foundation is implemented (schema + builder + browsing).
-- Exercise/label management UX is in active iteration.
+## Current Product Scope
+- Home v2 "Next workout" card (sequence-based suggestion logic).
+- Recovery states when active split and last-used split differ.
+- Split-day logger and free-workout logger in one screen.
+- Draft persistence for in-progress workout logging.
+- Session overview screen (view/edit/delete from Home recent sessions).
+- Exercise catalog with grouping/filtering and label management.
+- Split builder/detail flow with muscle-volume summary.
 
-## Repository Structure
-- `app/` - Flutter application code
-- `docs/` - setup, roadmap, and architecture docs
-- `scripts/windows/` - Windows helper scripts for setup/bootstrap
-- `AGENT.md` - contributor rules to keep project coherence
+## Screenshot Automation + Demo Fixtures
+From repository root (PowerShell):
 
-## Documentation Map
-- `docs/01_environment_setup.md`
-  - Windows setup walkthrough
-- `docs/02_long_term_plan.md`
-  - roadmap, phase tracking, and next priorities
-- `docs/03_codebase_guide.md`
-  - current architecture, data model, flow, and test strategy
-- `docs/04_change_log.md`
-  - detailed commit-by-commit implementation notes
-- `docs/05_screenshots.md`
-  - auto-generated screenshot index from integration manifest
-
-## Development Workflow
-From `app/`:
-
-```bash
-flutter pub get
-flutter analyze
-flutter test
-flutter run -d emulator-5554
+```powershell
+scripts\windows\seed_demo_data.ps1
+scripts\windows\run_screenshots.ps1
 ```
 
-## Windows Setup Scripts
-- `scripts/windows/install_prerequisites.ps1`
-- `scripts/windows/verify_environment.ps1`
-- `scripts/windows/create_flutter_app.ps1`
-- `scripts/windows/init_git_repo.ps1`
+What this does:
+- Resets local DBs and seeds deterministic demo data.
+- Captures the integration screenshot catalog on `emulator-5554`.
+- Writes PNGs to `app/screenshots/current/`.
+- Validates manifest vs files and regenerates `docs/05_screenshots.md`.
 
-These are useful for recovery/new machine onboarding even after initial setup.
+Developer-only controls in app:
+- `Other` tab -> `Debug tools`:
+  - `Reset + seed demo data`
+  - `Reset all data`
 
-## Screenshot Automation (Windows)
-- Seed deterministic demo data:
-  - `scripts/windows/seed_demo_data.ps1`
-- Capture full screenshot catalog:
-  - `scripts/windows/run_screenshots.ps1`
+## UI Previews (GitHub)
+Yes, GitHub renders images from relative repo paths.  
+These previews are stored in `app/screenshots/current/`.
+
+| Home | Logger |
+| --- | --- |
+| ![Home next workout](app/screenshots/current/home_next_workout.png) | ![Logger split day initial](app/screenshots/current/logger_split_day_initial.png) |
+| ![Home keep logging today](app/screenshots/current/home_keep_logging_today.png) | ![Logger exercise picker](app/screenshots/current/logger_exercise_picker_open.png) |
+
+Full catalog: `docs/05_screenshots.md`
+
+## Repository Structure
+- `app/` Flutter app source
+- `docs/` roadmap, architecture, changelog, screenshot index
+- `scripts/windows/` setup and screenshot helper scripts
+- `.github/workflows/` CI workflows
+- `AGENT.md` contributor guardrails
+
+## Docs Map
+- `docs/01_environment_setup.md` - Windows setup walkthrough
+- `docs/02_long_term_plan.md` - roadmap and phase tracking
+- `docs/03_codebase_guide.md` - architecture, data model, key flows
+- `docs/04_change_log.md` - implementation notes by commit
+- `docs/05_screenshots.md` - auto-generated screenshot index
