@@ -3,6 +3,8 @@
 Flutter training log app with split-day logging, free workout logging, and deterministic screenshot automation.
 
 ## Quick Start
+0. You need to have flutter and an android emulator
+installed (I use Android Studio)
 1. Clone repository:
    - `git clone https://github.com/darioberretti01-droid/training_log.git`
    - `cd training_log`
@@ -24,6 +26,33 @@ Flutter training log app with split-day logging, free workout logging, and deter
 - Session overview screen (view/edit/delete from Home recent sessions).
 - Exercise catalog with grouping/filtering and label management.
 - Split builder/detail flow with muscle-volume summary.
+
+## Daily App Commands (Windows PowerShell)
+From repository root:
+
+```powershell
+scripts\windows\dev_app.ps1 start
+scripts\windows\dev_app.ps1 restart
+scripts\windows\dev_app.ps1 stop
+scripts\windows\dev_app.ps1 status
+scripts\windows\dev_app.ps1 logs
+```
+
+Behavior defaults:
+- Auto-launches `Medium_Phone_API_36.1` if no Android device is online.
+- Runs in background and writes logs to `.devrunner/dev_app_latest.log`.
+- Uses fast restart path by default.
+
+Useful flags:
+- Fresh deploy when needed: `scripts\windows\dev_app.ps1 restart -Fresh`
+- Foreground run: `scripts\windows\dev_app.ps1 start -Foreground`
+- Skip dependency refresh: `scripts\windows\dev_app.ps1 start -NoPubGet`
+
+Convenience wrappers:
+- `scripts\windows\start_app.ps1`
+- `scripts\windows\restart_app.ps1`
+- `scripts\windows\stop_app.ps1`
+- `scripts\windows\app_status.ps1`
 
 ## Screenshot Automation + Demo Fixtures
 From repository root (PowerShell):
