@@ -346,6 +346,70 @@ void main() {
     expect(loaded!.splitName, 'Draft to persist');
     expect(loaded.days.first.title, 'Draft day');
   });
+
+  testWidgets('split builder can erase current split draft', (tester) async {
+    final repository = _FakeSplitRepository();
+    final database = AppDatabase(NativeDatabase.memory());
+    final storage = SplitBuilderDraftStorage(database);
+    await storage.saveDraft(
+      const SplitBuilderDraft(
+        splitName: 'Draft to erase',
+        setAsActive: true,
+        selectedVolumeControlLabels: ['chest'],
+        manuallyCreatedControlLabels: [],
+        updatedAtMs: 1,
+        days: [
+          SplitBuilderDayDraft(
+            title: 'Day 1',
+            plannedExercises: [
+              SplitBuilderPlannedExerciseDraft(
+                selectedExerciseId: 'bench_press',
+                sets: '3',
+                repMin: '8',
+                repMax: '12',
+                rest: '',
+                rpe: '',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    await _pumpSplitBuilder(
+      tester,
+      repository,
+      storage: storage,
+      resumeDraft: true,
+    );
+
+    expect(find.text('Draft to erase'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('split_builder_erase_draft')));
+    await tester.pumpAndSettle();
+    expect(find.text('Erase split draft?'), findsOneWidget);
+    expect(
+      find.text(
+        'You are erasing the current split draft. Do you want to continue?',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Erase'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Draft to erase'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('split_builder_erase_draft')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Erase'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Draft to erase'), findsNothing);
+    final loaded = await storage.loadDraft();
+    expect(loaded, isNull);
+  });
 }
 
 Future<void> _pumpSplitBuilder(

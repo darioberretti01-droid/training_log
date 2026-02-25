@@ -97,6 +97,16 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
         appBar: AppBar(
           title: Text(isEditing ? 'Edit Split' : 'Split Builder'),
           actions: [
+            if (!isEditing)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  key: const Key('split_builder_erase_draft'),
+                  onPressed: _isSaving ? null : _confirmEraseDraft,
+                  tooltip: 'Erase draft',
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilledButton(
@@ -618,6 +628,61 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
       }
     }
     return true;
+  }
+
+  Future<void> _confirmEraseDraft() async {
+    final shouldErase = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Erase split draft?'),
+        content: const Text(
+          'You are erasing the current split draft. Do you want to continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Erase'),
+          ),
+        ],
+      ),
+    );
+    if (shouldErase != true) {
+      return;
+    }
+    await _eraseDraft();
+  }
+
+  Future<void> _eraseDraft() async {
+    _splitNameController.clear();
+    _setAsActive = true;
+    _selectedVolumeControlLabels
+      ..clear()
+      ..addAll(defaultSplitVolumeControlLabels);
+    _manuallyCreatedControlLabels.clear();
+    _validationMessage = null;
+    _didResumeFromDraft = false;
+
+    for (final day in _days) {
+      day.dispose();
+    }
+    _days
+      ..clear()
+      ..add(_DayDraft());
+
+    setState(() {});
+    ref.invalidate(persistedSplitBuilderDraftProvider);
+    await _splitBuilderDraftStorage.clearDraft();
+
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Split draft erased.')));
   }
 
   Future<void> _save() async {
