@@ -158,7 +158,9 @@ void main() {
       );
 
       await tester.tap(
-        find.text('Build a split with ordered training days and planned exercises.'),
+        find.text(
+          'Build a split with ordered training days and planned exercises.',
+        ),
       );
       await tester.pump();
 
@@ -211,6 +213,59 @@ void main() {
 
     expect(find.text('Barbell Bench Press'), findsWidgets);
     expect(find.text('Pull-Up'), findsNothing);
+  });
+
+  testWidgets('split builder opens dedicated exercise picker screen', (
+    tester,
+  ) async {
+    final repository = _FakeSplitRepository();
+    await _pumpSplitBuilder(tester, repository);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_exercise_1')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('day_1_exercise_1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('split_builder_exercise_picker_search_field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('split_builder_exercise_picker_grouping_dropdown')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('split_builder_exercise_picker_view_toggle')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('split builder labels stay collapsed until chevron expands', (
+    tester,
+  ) async {
+    final repository = _FakeSplitRepository();
+    await _pumpSplitBuilder(tester, repository);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_exercise_1')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('day_1_exercise_1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Barbell Bench Press').last);
+    await tester.pumpAndSettle();
+
+    final labelsWrap = find.byKey(const Key('day_1_exercise_1_labels_wrap'));
+    expect(labelsWrap, findsNothing);
+    await tester.tap(find.byKey(const Key('day_1_exercise_1_labels_toggle')));
+    await tester.pumpAndSettle();
+    expect(labelsWrap, findsOneWidget);
+    expect(find.text('chest'), findsOneWidget);
+    expect(find.text('push'), findsOneWidget);
   });
 
   testWidgets('editing split preloads values and calls updateSplit', (
@@ -292,6 +347,11 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_add_exercise')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.byKey(const Key('day_1_add_exercise')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('day_1_exercise_2')), findsOneWidget);
@@ -329,66 +389,83 @@ void main() {
     expect(repository.createCalls, 0);
   });
 
-  testWidgets('split builder resumeDraft restores saved draft values', (
-    tester,
-  ) async {
-    final repository = _FakeSplitRepository();
-    final database = AppDatabase(NativeDatabase.memory());
-    final storage = SplitBuilderDraftStorage(database);
-    await storage.saveDraft(
-      const SplitBuilderDraft(
-        splitName: 'Saved split draft',
-        setAsActive: true,
-        selectedVolumeControlLabels: ['back', 'chest'],
-        manuallyCreatedControlLabels: ['forearms'],
-        updatedAtMs: 1,
-        days: [
-          SplitBuilderDayDraft(
-            title: 'Day from draft',
-            plannedExercises: [
-              SplitBuilderPlannedExerciseDraft(
-                selectedExerciseId: 'bench_press',
-                sets: '4',
-                repMin: '6',
-                repMax: '10',
-                rest: '120',
-                rpe: '8',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  testWidgets(
+    'split builder resumeDraft restores values and keeps exercise rows editable',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          seedDataProvider.overrideWith((ref) async {}),
-          exercisesProvider.overrideWith(
-            (ref) => Stream.value(const [
-              ExerciseWithLabels(
-                id: 'bench_press',
-                name: 'Barbell Bench Press',
-                labels: ['push', 'chest'],
-              ),
-            ]),
-          ),
-          splitRepositoryProvider.overrideWithValue(repository),
-          splitBuilderDraftStorageProvider.overrideWithValue(storage),
-        ],
-        child: const MaterialApp(home: SplitBuilderScreen(resumeDraft: true)),
-      ),
-    );
-    await tester.pumpAndSettle();
+      final repository = _FakeSplitRepository();
+      final database = AppDatabase(NativeDatabase.memory());
+      final storage = SplitBuilderDraftStorage(database);
+      await storage.saveDraft(
+        const SplitBuilderDraft(
+          splitName: 'Saved split draft',
+          setAsActive: true,
+          selectedVolumeControlLabels: ['back', 'chest'],
+          manuallyCreatedControlLabels: ['forearms'],
+          updatedAtMs: 1,
+          days: [
+            SplitBuilderDayDraft(
+              title: 'Day from draft',
+              plannedExercises: [
+                SplitBuilderPlannedExerciseDraft(
+                  selectedExerciseId: 'bench_press',
+                  sets: '4',
+                  repMin: '6',
+                  repMax: '10',
+                  rest: '120',
+                  rpe: '8',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
 
-    expect(find.text('Saved split draft'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('day_1_exercise_1')),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.byKey(const Key('day_1_exercise_1')), findsOneWidget);
-  });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            seedDataProvider.overrideWith((ref) async {}),
+            exercisesProvider.overrideWith(
+              (ref) => Stream.value(const [
+                ExerciseWithLabels(
+                  id: 'bench_press',
+                  name: 'Barbell Bench Press',
+                  labels: ['push', 'chest'],
+                ),
+              ]),
+            ),
+            splitRepositoryProvider.overrideWithValue(repository),
+            splitBuilderDraftStorageProvider.overrideWithValue(storage),
+          ],
+          child: const MaterialApp(home: SplitBuilderScreen(resumeDraft: true)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Saved split draft'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('day_1_exercise_1')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.byKey(const Key('day_1_exercise_1')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('day_1_add_exercise')));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('day_1_exercise_2')), findsOneWidget);
+
+      final removeExerciseButton = find.byTooltip('Remove exercise');
+      await tester.ensureVisible(removeExerciseButton.first);
+      await tester.tap(removeExerciseButton.first);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('day_1_exercise_2')), findsNothing);
+    },
+  );
 
   testWidgets('split builder persists draft when leaving screen', (
     tester,

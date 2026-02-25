@@ -26,6 +26,80 @@ void main() {
     expect(find.byIcon(Icons.history), findsNothing);
   });
 
+  testWidgets('pill view shows labels under exercise name', (tester) async {
+    await _pumpExerciseList(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(
+          id: 'bench_press',
+          name: 'Barbell Bench Press',
+          labels: ['chest', 'push'],
+        ),
+      ],
+    );
+
+    expect(
+      find.widgetWithText(ActionChip, 'Barbell Bench Press'),
+      findsOneWidget,
+    );
+    expect(find.text('chest, push'), findsOneWidget);
+  });
+
+  testWidgets(
+    'split builder picker places view toggle to the right of division selector',
+    (tester) async {
+      await _pumpExerciseSelectionScreen(
+        tester,
+        exercises: const [
+          ExerciseWithLabels(
+            id: 'bench_press',
+            name: 'Barbell Bench Press',
+            labels: ['chest', 'push'],
+          ),
+        ],
+      );
+
+      final divisionCenter = tester.getCenter(
+        find.byKey(
+          const Key('split_builder_exercise_picker_grouping_dropdown'),
+        ),
+      );
+      final toggleCenter = tester.getCenter(
+        find.byKey(const Key('split_builder_exercise_picker_view_toggle')),
+      );
+      expect((divisionCenter.dy - toggleCenter.dy).abs(), lessThan(8));
+      expect(toggleCenter.dx, greaterThan(divisionCenter.dx));
+    },
+  );
+
+  testWidgets('split builder picker highlights selected exercise pill', (
+    tester,
+  ) async {
+    await _pumpExerciseSelectionScreen(
+      tester,
+      exercises: const [
+        ExerciseWithLabels(
+          id: 'bench_press',
+          name: 'Barbell Bench Press',
+          labels: ['chest', 'push'],
+        ),
+      ],
+      selectedExerciseId: 'bench_press',
+    );
+
+    final selectedPill = find.byKey(
+      const Key('split_builder_picker_exercise_pill_bench_press'),
+    );
+    expect(selectedPill, findsOneWidget);
+    expect(
+      find.descendant(
+        of: selectedPill,
+        matching: find.byIcon(Icons.check_circle_outline),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('division dropdown can switch to all exercises', (tester) async {
     await _pumpExerciseList(
       tester,
@@ -351,6 +425,22 @@ Future<void> _pumpExerciseList(
         ),
       ],
       child: const MaterialApp(home: Scaffold(body: ExerciseListContent())),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpExerciseSelectionScreen(
+  WidgetTester tester, {
+  required List<ExerciseWithLabels> exercises,
+  String? selectedExerciseId,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: ExerciseSelectionScreen(
+        exercises: exercises,
+        selectedExerciseId: selectedExerciseId,
+      ),
     ),
   );
   await tester.pumpAndSettle();

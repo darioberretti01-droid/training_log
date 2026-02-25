@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/state/providers.dart';
 import '../../core/time/app_clock.dart';
+import '../exercises/exercise_list_screen.dart';
 import 'split_builder_draft.dart';
 import 'split_builder_draft_storage.dart';
 import 'split_repository.dart';
@@ -155,7 +156,8 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
 
                     return _buildSeedAndExercisesBody();
                   },
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (error, _) => _BuilderErrorState(
                     message: 'Failed to load split details: $error',
                     onRetry: () {
@@ -273,7 +275,7 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
               rpe: planned.rpe,
             ),
           )
-          .toList(growable: false);
+          .toList();
       _days.add(
         _DayDraft(
           title: day.title,
@@ -404,6 +406,8 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
               dayDraft: _days[dayIndex],
               exercises: exercises,
               onChanged: _handleBuilderInputChanged,
+              onPickExercise: (selectedExerciseId) =>
+                  _pickExerciseForBuilder(exercises, selectedExerciseId),
               onAddExercise: () => _addExercise(dayIndex),
               onRemoveExercise: (exerciseIndex) =>
                   _removeExercise(dayIndex, exerciseIndex),
@@ -514,6 +518,20 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
     final removed = day.plannedExercises.removeAt(exerciseIndex);
     removed.dispose();
     setState(() {});
+  }
+
+  Future<ExerciseWithLabels?> _pickExerciseForBuilder(
+    List<ExerciseWithLabels> exercises,
+    String? selectedExerciseId,
+  ) {
+    return Navigator.of(context).push<ExerciseWithLabels>(
+      MaterialPageRoute(
+        builder: (context) => ExerciseSelectionScreen(
+          exercises: exercises,
+          selectedExerciseId: selectedExerciseId,
+        ),
+      ),
+    );
   }
 
   void _saveDraftForResume({bool invalidateProvider = true}) {
@@ -886,6 +904,7 @@ class _DayCard extends StatelessWidget {
     required this.dayDraft,
     required this.exercises,
     required this.onChanged,
+    required this.onPickExercise,
     required this.onAddExercise,
     required this.onRemoveExercise,
     this.onRemoveDay,
@@ -895,6 +914,8 @@ class _DayCard extends StatelessWidget {
   final _DayDraft dayDraft;
   final List<ExerciseWithLabels> exercises;
   final VoidCallback onChanged;
+  final Future<ExerciseWithLabels?> Function(String? selectedExerciseId)
+  onPickExercise;
   final VoidCallback onAddExercise;
   final ValueChanged<int> onRemoveExercise;
   final VoidCallback? onRemoveDay;
@@ -942,6 +963,7 @@ class _DayCard extends StatelessWidget {
                   draft: dayDraft.plannedExercises[index],
                   exercises: exercises,
                   onChanged: onChanged,
+                  onPickExercise: onPickExercise,
                   onRemove: dayDraft.plannedExercises.length > 1
                       ? () => onRemoveExercise(index)
                       : null,
@@ -968,6 +990,7 @@ class _PlannedExerciseCard extends StatelessWidget {
     required this.draft,
     required this.exercises,
     required this.onChanged,
+    required this.onPickExercise,
     this.onRemove,
   });
 
@@ -976,10 +999,29 @@ class _PlannedExerciseCard extends StatelessWidget {
   final _PlannedExerciseDraft draft;
   final List<ExerciseWithLabels> exercises;
   final VoidCallback onChanged;
+  final Future<ExerciseWithLabels?> Function(String? selectedExerciseId)
+  onPickExercise;
   final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
+    ExerciseWithLabels? selectedExercise;
+    final selectedId = draft.selectedExerciseId;
+    if (selectedId != null && selectedId.isNotEmpty) {
+      for (final exercise in exercises) {
+        if (exercise.id == selectedId) {
+          selectedExercise = exercise;
+          break;
+        }
+      }
+    }
+    final selectedName = selectedExercise?.name;
+    final selectedLabels = selectedExercise?.labels ?? const <String>[];
+    final canSelectExercise = exercises.isNotEmpty;
+    final pickerPlaceholder = canSelectExercise
+        ? 'Choose exercise'
+        : 'No exercises available';
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -1006,27 +1048,107 @@ class _PlannedExerciseCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
+            InkWell(
               key: Key('day_${dayNumber}_exercise_$exerciseNumber'),
-              initialValue: draft.selectedExerciseId,
-              items: exercises
-                  .map(
-                    (exercise) => DropdownMenuItem(
-                      value: exercise.id,
-                      child: Text(exercise.name),
+              onTap: !canSelectExercise
+                  ? null
+                  : () async {
+                      final selected = await onPickExercise(
+                        draft.selectedExerciseId,
+                      );
+                      if (selected == null) {
+                        return;
+                      }
+                      draft
+                        ..selectedExerciseId = selected.id
+                        ..areLabelsExpanded = false;
+                      onChanged();
+                    },
+              borderRadius: BorderRadius.circular(6),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Exercise *',
+                  border: OutlineInputBorder(),
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
+                ),
+                isEmpty: false,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            selectedName ?? pickerPlaceholder,
+                            style: selectedName == null
+                                ? TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  )
+                                : null,
+                          ),
+                        ],
+                      ),
                     ),
-                  )
-                  .toList(growable: false),
-              onChanged: (value) {
-                draft.selectedExerciseId = value;
-                onChanged();
-              },
-              decoration: const InputDecoration(
-                labelText: 'Exercise *',
-                border: OutlineInputBorder(),
+                    if (canSelectExercise)
+                      const Icon(Icons.arrow_forward_ios, size: 14),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
+            if (selectedLabels.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Text('Labels', style: Theme.of(context).textTheme.labelSmall),
+                  const Spacer(),
+                  IconButton(
+                    key: Key(
+                      'day_${dayNumber}_exercise_${exerciseNumber}_labels_toggle',
+                    ),
+                    tooltip: draft.areLabelsExpanded
+                        ? 'Hide labels'
+                        : 'Show labels',
+                    onPressed: () {
+                      draft.areLabelsExpanded = !draft.areLabelsExpanded;
+                      onChanged();
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 28,
+                      height: 28,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      draft.areLabelsExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      size: 18,
+                    ),
+                  ),
+                ],
+              ),
+              if (draft.areLabelsExpanded) ...[
+                const SizedBox(height: 2),
+                Wrap(
+                  key: Key(
+                    'day_${dayNumber}_exercise_${exerciseNumber}_labels_wrap',
+                  ),
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: selectedLabels
+                      .map((label) => _ExerciseLabelTag(label: label))
+                      .toList(growable: false),
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                const SizedBox(height: 8),
+              ],
+            ] else ...[
+              const SizedBox(height: 8),
+            ],
             Row(
               children: [
                 Expanded(
@@ -1096,6 +1218,28 @@ class _PlannedExerciseCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ExerciseLabelTag extends StatelessWidget {
+  const _ExerciseLabelTag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Text(label, style: Theme.of(context).textTheme.labelMedium),
       ),
     );
   }
@@ -1191,6 +1335,7 @@ class _PlannedExerciseDraft {
        targetRpeController = TextEditingController(text: rpe);
 
   String? selectedExerciseId;
+  bool areLabelsExpanded = false;
   final TextEditingController targetSetsController;
   final TextEditingController repMinController;
   final TextEditingController repMaxController;

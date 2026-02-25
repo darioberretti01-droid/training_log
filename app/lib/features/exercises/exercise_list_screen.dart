@@ -21,6 +21,345 @@ class ExerciseListScreen extends ConsumerWidget {
   }
 }
 
+class ExerciseSelectionScreen extends StatefulWidget {
+  const ExerciseSelectionScreen({
+    super.key,
+    required this.exercises,
+    this.title = 'Choose exercise',
+    this.selectedExerciseId,
+  });
+
+  final List<ExerciseWithLabels> exercises;
+  final String title;
+  final String? selectedExerciseId;
+
+  @override
+  State<ExerciseSelectionScreen> createState() =>
+      _ExerciseSelectionScreenState();
+}
+
+class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  _ExerciseDivision _division = _ExerciseDivision.muscles;
+  _ExercisePresentation _presentation = _ExercisePresentation.pills;
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _toFilteredItems(widget.exercises);
+    final sections = _buildSections(items);
+    final itemSectionCount = _itemSectionCount(sections);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.title)),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildSearchField(),
+            const SizedBox(height: 10),
+            _buildDivisionAndViewControls(),
+            const SizedBox(height: 12),
+            if (sections.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Text('No exercises match the current filter.'),
+                ),
+              )
+            else
+              ...sections.map(
+                (section) => _buildSection(context, section, itemSectionCount),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return TextField(
+      key: const Key('split_builder_exercise_picker_search_field'),
+      controller: _searchController,
+      decoration: const InputDecoration(
+        labelText: 'Search exercises',
+        border: OutlineInputBorder(),
+        prefixIcon: Icon(Icons.search),
+      ),
+      onChanged: (value) {
+        setState(() => _query = value.trim().toLowerCase());
+      },
+      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+    );
+  }
+
+  Widget _buildDivisionAndViewControls() {
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<_ExerciseDivision>(
+            key: const Key('split_builder_exercise_picker_grouping_dropdown'),
+            initialValue: _division,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Division',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: _ExerciseDivision.values
+                .map(
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text(
+                      _divisionLabel(value),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: (value) {
+              if (value == null) {
+                return;
+              }
+              setState(() => _division = value);
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        ToggleButtons(
+          key: const Key('split_builder_exercise_picker_view_toggle'),
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          isSelected: [
+            _presentation == _ExercisePresentation.pills,
+            _presentation == _ExercisePresentation.list,
+          ],
+          onPressed: (index) {
+            setState(() {
+              _presentation = index == 0
+                  ? _ExercisePresentation.pills
+                  : _ExercisePresentation.list;
+            });
+          },
+          children: const [
+            Icon(Icons.local_offer_outlined, size: 18),
+            Icon(Icons.view_list_outlined, size: 18),
+          ],
+        ),
+      ],
+    );
+  }
+
+  List<_ExerciseListItem> _toFilteredItems(List<ExerciseWithLabels> exercises) {
+    final filtered = <_ExerciseListItem>[];
+    for (final exercise in exercises) {
+      if (_query.isNotEmpty && !exercise.name.toLowerCase().contains(_query)) {
+        continue;
+      }
+      filtered.add(
+        _ExerciseListItem(exercise: exercise, createdAtMs: 0, logCount: 0),
+      );
+    }
+
+    filtered.sort((a, b) {
+      final byName = a.nameLower.compareTo(b.nameLower);
+      if (byName != 0) {
+        return byName;
+      }
+      return a.exercise.id.compareTo(b.exercise.id);
+    });
+    return filtered;
+  }
+
+  List<_ExerciseSection> _buildSections(List<_ExerciseListItem> items) {
+    final definitions = _divisionSections(_division);
+    final byTitle = <String, List<_ExerciseListItem>>{
+      for (final section in definitions) section.title: <_ExerciseListItem>[],
+    };
+
+    if (_division == _ExerciseDivision.allExercises) {
+      byTitle[definitions.first.title]!.addAll(items);
+      return [_ExerciseSection(title: definitions.first.title, items: items)];
+    }
+
+    final otherSection = definitions.last;
+    for (final item in items) {
+      if (_division == _ExerciseDivision.muscles) {
+        final matches = <_DivisionSection>[];
+        for (final section in definitions) {
+          if (section.isOther) {
+            continue;
+          }
+          if (item.matches(section.labelMatchers)) {
+            matches.add(section);
+          }
+        }
+        if (matches.isEmpty) {
+          byTitle[otherSection.title]!.add(item);
+          continue;
+        }
+        for (final section in matches) {
+          byTitle[section.title]!.add(item);
+        }
+        continue;
+      }
+
+      _DivisionSection? matched;
+      for (final section in definitions) {
+        if (section.isOther) {
+          continue;
+        }
+        if (item.matches(section.labelMatchers)) {
+          matched = section;
+          break;
+        }
+      }
+      byTitle[matched?.title ?? otherSection.title]!.add(item);
+    }
+
+    final output = <_ExerciseSection>[];
+    for (final section in definitions) {
+      final sectionItems = byTitle[section.title]!;
+      if (sectionItems.isEmpty) {
+        continue;
+      }
+      output.add(_ExerciseSection(title: section.title, items: sectionItems));
+    }
+    return output;
+  }
+
+  Map<String, int> _itemSectionCount(List<_ExerciseSection> sections) {
+    final counts = <String, int>{};
+    for (final section in sections) {
+      for (final item in section.items) {
+        counts.update(
+          item.exercise.id,
+          (value) => value + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
+    return counts;
+  }
+
+  Widget _buildSection(
+    BuildContext context,
+    _ExerciseSection section,
+    Map<String, int> itemSectionCount,
+  ) {
+    final titleStyle = Theme.of(
+      context,
+    ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(section.title, style: titleStyle),
+          const SizedBox(height: 8),
+          if (_presentation == _ExercisePresentation.pills)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: section.items
+                  .map((item) {
+                    final isSelected =
+                        widget.selectedExerciseId == item.exercise.id;
+                    return ActionChip(
+                      key: _exerciseKey(
+                        prefix: 'split_builder_picker_exercise_pill',
+                        exerciseId: item.exercise.id,
+                        sectionTitle: section.title,
+                        itemSectionCount: itemSectionCount,
+                      ),
+                      label: _ExercisePillLabel(exercise: item.exercise),
+                      avatar: isSelected
+                          ? Icon(
+                              Icons.check_circle_outline,
+                              size: 14,
+                              color: Theme.of(context).colorScheme.primary,
+                            )
+                          : null,
+                      side: isSelected
+                          ? BorderSide(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.6),
+                            )
+                          : null,
+                      backgroundColor: isSelected
+                          ? Theme.of(context).colorScheme.primaryContainer
+                                .withValues(alpha: 0.35)
+                          : null,
+                      onPressed: () => Navigator.of(context).pop(item.exercise),
+                    );
+                  })
+                  .toList(growable: false),
+            )
+          else
+            Card(
+              margin: EdgeInsets.zero,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(section.items.length, (index) {
+                  final item = section.items[index];
+                  final isLast = index == section.items.length - 1;
+                  final selected =
+                      widget.selectedExerciseId == item.exercise.id;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        key: _exerciseKey(
+                          prefix: 'split_builder_picker_exercise_list',
+                          exerciseId: item.exercise.id,
+                          sectionTitle: section.title,
+                          itemSectionCount: itemSectionCount,
+                        ),
+                        title: Text(item.exercise.name),
+                        subtitle: item.exercise.labels.isEmpty
+                            ? null
+                            : Text(item.exercise.labels.join(', ')),
+                        trailing: selected ? const Icon(Icons.check) : null,
+                        onTap: () => Navigator.of(context).pop(item.exercise),
+                      ),
+                      if (!isLast) const Divider(height: 1),
+                    ],
+                  );
+                }),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Key _exerciseKey({
+    required String prefix,
+    required String exerciseId,
+    required String sectionTitle,
+    required Map<String, int> itemSectionCount,
+  }) {
+    final count = itemSectionCount[exerciseId] ?? 1;
+    if (count <= 1) {
+      return Key('${prefix}_$exerciseId');
+    }
+    final sectionToken = sectionTitle
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+    return Key('${prefix}_${exerciseId}_$sectionToken');
+  }
+}
+
 enum _ExerciseDivision {
   muscles,
   pushPullLegs,
@@ -627,7 +966,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
         sectionTitle: sectionTitle,
         itemSectionCount: itemSectionCount,
       ),
-      label: Text(exercise.name),
+      label: _ExercisePillLabel(exercise: exercise),
       onPressed: _isMutating
           ? null
           : () {
@@ -845,6 +1184,37 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     if (mounted) {
       setState(() => _armedExerciseId = null);
     }
+  }
+}
+
+class _ExercisePillLabel extends StatelessWidget {
+  const _ExercisePillLabel({required this.exercise});
+
+  final ExerciseWithLabels exercise;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = exercise.labels.take(3).join(', ');
+    final secondaryStyle = Theme.of(
+      context,
+    ).textTheme.labelSmall?.copyWith(fontSize: 10, height: 1.1);
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 170),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(exercise.name, overflow: TextOverflow.ellipsis),
+          if (labels.isNotEmpty)
+            Text(
+              labels,
+              style: secondaryStyle,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
+    );
   }
 }
 

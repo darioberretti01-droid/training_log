@@ -265,7 +265,7 @@ const screenshotManifest = <ScreenshotManifestEntry>[
     scenario: DemoFixtureScenario.baseRealistic,
     captureStep: ScreenshotCaptureStep.splitBuilderExercisePickerOpen,
     routeGroup: 'splits',
-    notes: 'Exercise selector dropdown in split builder.',
+    notes: 'Full-screen exercise picker in split builder.',
   ),
   ScreenshotManifestEntry(
     id: 'exercises_delete_mode_active',
