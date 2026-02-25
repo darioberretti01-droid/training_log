@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/widgets/label_pill_selector.dart';
 import 'split_volume.dart';
 
-class SplitBuilderMuscleVolumeCard extends StatelessWidget {
+class SplitBuilderMuscleVolumeCard extends StatefulWidget {
   const SplitBuilderMuscleVolumeCard({
     required this.summary,
     required this.availableControlLabels,
@@ -20,6 +20,14 @@ class SplitBuilderMuscleVolumeCard extends StatelessWidget {
   final Future<bool> Function(String label) onCreateControlLabel;
 
   @override
+  State<SplitBuilderMuscleVolumeCard> createState() =>
+      _SplitBuilderMuscleVolumeCardState();
+}
+
+class _SplitBuilderMuscleVolumeCardState extends State<SplitBuilderMuscleVolumeCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       key: const Key('split_builder_volume_overview'),
@@ -28,51 +36,69 @@ class SplitBuilderMuscleVolumeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Volume by muscle (sets)',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Based on exercise labels. Each exercise contributes all sets '
-              'to each selected control label it has.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 10),
             Row(
               children: [
-                Text(
-                  'Whole split (${summary.totalPlannedSets} planned sets)',
-                  style: Theme.of(context).textTheme.titleSmall,
+                Expanded(
+                  child: Text(
+                    'Volume by muscle (sets)',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  key: const Key('split_volume_control_labels_button'),
-                  onPressed: () => _openControlLabelsDialog(context),
-                  icon: const Icon(Icons.tune, size: 16),
-                  label: const Text('Control labels'),
+                IconButton(
+                  key: const Key('split_builder_volume_toggle'),
+                  tooltip: _isExpanded
+                      ? 'Collapse volume by muscle'
+                      : 'Expand volume by muscle',
+                  onPressed: () => setState(() => _isExpanded = !_isExpanded),
+                  icon: Icon(
+                    _isExpanded ? Icons.expand_less : Icons.expand_more,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            if (!summary.hasTrackedMuscles)
-              const Text(
-                'Select at least one control label to track muscle volume.',
-              )
-            else ...[
-              _VolumeBars(
-                volumes: summary.totalMuscleVolumes,
-                emptyText: 'No tracked control labels in this split yet.',
+            if (_isExpanded) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Based on exercise labels. Each exercise contributes all sets '
+                'to each selected control label it has.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-              const SizedBox(height: 12),
-              Text('By day', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              ...summary.daySummaries.map(
-                (day) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _BuilderDayMuscleVolumeCard(day: day),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Text(
+                    'Whole split (${widget.summary.totalPlannedSets} planned sets)',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    key: const Key('split_volume_control_labels_button'),
+                    onPressed: () => _openControlLabelsDialog(context),
+                    icon: const Icon(Icons.tune, size: 16),
+                    label: const Text('Control labels'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (!widget.summary.hasTrackedMuscles)
+                const Text(
+                  'Select at least one control label to track muscle volume.',
+                )
+              else ...[
+                _VolumeBars(
+                  volumes: widget.summary.totalMuscleVolumes,
+                  emptyText: 'No tracked control labels in this split yet.',
                 ),
-              ),
+                const SizedBox(height: 12),
+                Text('By day', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                ...widget.summary.daySummaries.map(
+                  (day) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BuilderDayMuscleVolumeCard(day: day),
+                  ),
+                ),
+              ],
             ],
           ],
         ),
@@ -81,7 +107,7 @@ class SplitBuilderMuscleVolumeCard extends StatelessWidget {
   }
 
   Future<void> _openControlLabelsDialog(BuildContext context) async {
-    final draftSelection = [...selectedControlLabels];
+    final draftSelection = [...widget.selectedControlLabels];
     await showDialog<void>(
       context: context,
       builder: (context) {
@@ -93,7 +119,7 @@ class SplitBuilderMuscleVolumeCard extends StatelessWidget {
               content: SizedBox(
                 width: 420,
                 child: LabelPillSelector(
-                  availableLabels: availableControlLabels,
+                  availableLabels: widget.availableControlLabels,
                   selectedLabels: draftSelection,
                   onSelectedLabelsChanged: (labels) {
                     setDialogState(() {
@@ -102,7 +128,7 @@ class SplitBuilderMuscleVolumeCard extends StatelessWidget {
                         ..addAll(labels);
                     });
                   },
-                  onCreateLabel: onCreateControlLabel,
+                  onCreateLabel: widget.onCreateControlLabel,
                   searchHintText: 'Search control labels',
                   emptyText: 'No labels available.',
                 ),
@@ -114,7 +140,7 @@ class SplitBuilderMuscleVolumeCard extends StatelessWidget {
                 ),
                 FilledButton(
                   onPressed: () {
-                    onControlLabelsChanged(draftSelection);
+                    widget.onControlLabelsChanged(draftSelection);
                     Navigator.of(context).pop();
                   },
                   child: const Text('Apply'),

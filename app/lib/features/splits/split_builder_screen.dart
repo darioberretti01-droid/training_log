@@ -123,47 +123,51 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
             ),
           ],
         ),
-        body: _isInitializingDraft
-            ? const Center(child: CircularProgressIndicator())
-            : splitDetailsState.when(
-                data: (details) {
-                  if (isEditing) {
-                    if (details == null) {
-                      return _BuilderErrorState(
-                        message: 'Split not found.',
-                        onRetry: () {
-                          ref.invalidate(
-                            splitDetailsProvider(widget.editingSplitId!),
-                          );
-                        },
-                      );
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: _isInitializingDraft
+              ? const Center(child: CircularProgressIndicator())
+              : splitDetailsState.when(
+                  data: (details) {
+                    if (isEditing) {
+                      if (details == null) {
+                        return _BuilderErrorState(
+                          message: 'Split not found.',
+                          onRetry: () {
+                            ref.invalidate(
+                              splitDetailsProvider(widget.editingSplitId!),
+                            );
+                          },
+                        );
+                      }
+
+                      if (!_didHydrateFromExisting) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted || _didHydrateFromExisting) {
+                            return;
+                          }
+                          _hydrateFromSplitDetails(details);
+                        });
+                        return const Center(child: CircularProgressIndicator());
+                      }
                     }
 
-                    if (!_didHydrateFromExisting) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!mounted || _didHydrateFromExisting) {
-                          return;
-                        }
-                        _hydrateFromSplitDetails(details);
-                      });
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                  }
-
-                  return _buildSeedAndExercisesBody();
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => _BuilderErrorState(
-                  message: 'Failed to load split details: $error',
-                  onRetry: () {
-                    if (widget.editingSplitId != null) {
-                      ref.invalidate(
-                        splitDetailsProvider(widget.editingSplitId!),
-                      );
-                    }
+                    return _buildSeedAndExercisesBody();
                   },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => _BuilderErrorState(
+                    message: 'Failed to load split details: $error',
+                    onRetry: () {
+                      if (widget.editingSplitId != null) {
+                        ref.invalidate(
+                          splitDetailsProvider(widget.editingSplitId!),
+                        );
+                      }
+                    },
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }
@@ -399,7 +403,7 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
               dayNumber: dayIndex + 1,
               dayDraft: _days[dayIndex],
               exercises: exercises,
-              onChanged: _clearValidation,
+              onChanged: _handleBuilderInputChanged,
               onAddExercise: () => _addExercise(dayIndex),
               onRemoveExercise: (exerciseIndex) =>
                   _removeExercise(dayIndex, exerciseIndex),
@@ -858,6 +862,12 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
   void _showValidation(String message) {
     setState(() {
       _validationMessage = message;
+    });
+  }
+
+  void _handleBuilderInputChanged() {
+    setState(() {
+      _validationMessage = null;
     });
   }
 

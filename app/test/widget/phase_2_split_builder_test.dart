@@ -27,6 +27,12 @@ void main() {
       );
       expect(
         find.byKey(const Key('split_volume_control_labels_button')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('split_builder_volume_toggle')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('split_volume_control_labels_button')),
         findsOneWidget,
       );
       await tester.tap(
@@ -94,6 +100,74 @@ void main() {
       1,
     );
   });
+
+  testWidgets(
+    'split builder volume updates immediately on exercise and sets changes',
+    (tester) async {
+      final repository = _FakeSplitRepository();
+      await _pumpSplitBuilder(tester, repository);
+
+      await tester.tap(find.byKey(const Key('split_builder_volume_toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('Whole split (0 planned sets)'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('day_1_exercise_1')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('day_1_exercise_1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Barbell Bench Press').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Whole split (3 planned sets)'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('day_1_exercise_1_sets')),
+        '5',
+      );
+      await tester.pump();
+
+      expect(find.text('Whole split (5 planned sets)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'split builder unfocuses selected input when tapping non-action area',
+    (tester) async {
+      final repository = _FakeSplitRepository();
+      await _pumpSplitBuilder(tester, repository);
+
+      final setsField = find.byKey(const Key('day_1_exercise_1_sets'));
+      await tester.scrollUntilVisible(
+        setsField,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(setsField);
+      await tester.pump();
+
+      final editableFinder = find.descendant(
+        of: setsField,
+        matching: find.byType(EditableText),
+      );
+      expect(
+        tester.widget<EditableText>(editableFinder).focusNode.hasFocus,
+        isTrue,
+      );
+
+      await tester.tap(
+        find.text('Build a split with ordered training days and planned exercises.'),
+      );
+      await tester.pump();
+
+      expect(
+        tester.widget<EditableText>(editableFinder).focusNode.hasFocus,
+        isFalse,
+      );
+    },
+  );
 
   testWidgets('hidden exercises are excluded from split builder selector', (
     tester,
