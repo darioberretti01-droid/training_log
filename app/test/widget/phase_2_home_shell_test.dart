@@ -351,6 +351,81 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('split disclosure shows day and exercise set summary', (
+    tester,
+  ) async {
+    final repository = _FakeSplitRepository()
+      ..detailsById['split_1'] = const SplitDetails(
+        id: 'split_1',
+        name: 'Upper Lower',
+        isActive: true,
+        createdAt: 1,
+        updatedAt: 2,
+        days: [
+          DayPlanDetails(
+            id: 'day_1',
+            dayIndex: 1,
+            title: 'Upper A',
+            plannedExercises: [
+              PlannedExerciseDetails(
+                id: 'plan_1',
+                orderIndex: 1,
+                exerciseId: 'bench_press',
+                exerciseName: 'Barbell Bench Press',
+                targetSets: 3,
+                repMin: 8,
+                repMax: 12,
+                restSeconds: null,
+                targetRpe: null,
+              ),
+            ],
+          ),
+        ],
+      );
+    final splits = [
+      const SplitSummary(
+        id: 'split_1',
+        name: 'Upper Lower',
+        isActive: true,
+        dayCount: 1,
+        updatedAt: 1,
+        totalSets: 3,
+        lastLoggedAt: 1,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (count, error) => null,
+        overrides: [
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith((ref) => Stream.value(const [])),
+          splitsProvider.overrideWith((ref) => Stream.value(splits)),
+          splitRepositoryProvider.overrideWithValue(repository),
+          recentHomeSessionsProvider.overrideWith((ref) async => const []),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
+        ],
+        child: const TrainingLogApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.view_week_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Show split summary'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Upper A: 3 sets'), findsOneWidget);
+    expect(find.text('Barbell Bench Press: 3 sets'), findsOneWidget);
+    expect(find.textContaining('Last logged:'), findsOneWidget);
+  });
 }
 
 final _sampleSplits = [

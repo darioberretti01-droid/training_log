@@ -59,6 +59,9 @@ class SplitsScreen extends ConsumerWidget {
               await ref.read(splitBuilderDraftStorageProvider).clearDraft();
               ref.invalidate(persistedSplitBuilderDraftProvider);
             }
+            if (!context.mounted) {
+              return;
+            }
             await context.push('/splits/builder');
             ref.invalidate(persistedSplitBuilderDraftProvider);
           },
@@ -172,7 +175,9 @@ class _CurrentSplitCard extends StatelessWidget {
                   split!.name,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                subtitle: Text(_dayCountLabel(split!.dayCount)),
+                subtitle: Text(
+                  _splitStatsLabel(split!.dayCount, split!.totalSets),
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/splits/${split!.id}'),
               ),
@@ -181,33 +186,128 @@ class _CurrentSplitCard extends StatelessWidget {
   }
 }
 
-class _SplitListCard extends StatelessWidget {
+class _SplitListCard extends ConsumerStatefulWidget {
   const _SplitListCard({required this.split});
 
   final SplitSummary split;
 
   @override
+  ConsumerState<_SplitListCard> createState() => _SplitListCardState();
+}
+
+class _SplitListCardState extends ConsumerState<_SplitListCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final updatedAt = DateTime.fromMillisecondsSinceEpoch(split.updatedAt);
+    final split = widget.split;
     return Card(
-      child: ListTile(
-        title: Text(split.name),
-        subtitle: Text(
-          '${_dayCountLabel(split.dayCount)} | Updated ${DateFormat('yyyy-MM-dd HH:mm').format(updatedAt)}',
-        ),
-        trailing: split.isActive
-            ? const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Chip(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            title: Text(split.name),
+            subtitle: Text(_splitStatsLabel(split.dayCount, split.totalSets)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (split.isActive)
+                  const Chip(
                     label: Text('Active'),
                     visualDensity: VisualDensity.compact,
                   ),
-                  Icon(Icons.chevron_right),
-                ],
-              )
-            : const Icon(Icons.chevron_right),
-        onTap: () => context.push('/splits/${split.id}'),
+                IconButton(
+                  icon: Icon(
+                    _isExpanded ? Icons.expand_less : Icons.expand_more,
+                  ),
+                  tooltip: _isExpanded
+                      ? 'Hide split summary'
+                      : 'Show split summary',
+                  onPressed: () => setState(() => _isExpanded = !_isExpanded),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            onTap: () => context.push('/splits/${split.id}'),
+          ),
+          if (_isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _SplitDisclosureContent(split: split),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SplitDisclosureContent extends ConsumerWidget {
+  const _SplitDisclosureContent({required this.split});
+
+  final SplitSummary split;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detailsState = ref.watch(splitDetailsProvider(split.id));
+    return detailsState.when(
+      data: (details) {
+        if (details == null) {
+          return Text(
+            'Split details unavailable.\nLast logged: ${_lastLoggedLabel(split.lastLoggedAt)}',
+          );
+        }
+
+        final rows = <Widget>[];
+        if (details.days.isEmpty) {
+          rows.add(const Text('No day plans configured.'));
+        } else {
+          for (var dayIndex = 0; dayIndex < details.days.length; dayIndex++) {
+            final day = details.days[dayIndex];
+            final daySetTotal = day.plannedExercises.fold<int>(
+              0,
+              (sum, exercise) => sum + exercise.targetSets,
+            );
+            rows.add(
+              Text(
+                '${day.title}: ${_setCountLabel(daySetTotal)}',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            );
+            for (final exercise in day.plannedExercises) {
+              rows.add(
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, top: 2),
+                  child: Text(
+                    '${exercise.exerciseName}: ${_setCountLabel(exercise.targetSets)}',
+                  ),
+                ),
+              );
+            }
+            if (dayIndex != details.days.length - 1) {
+              rows.add(const SizedBox(height: 8));
+            }
+          }
+        }
+
+        rows.add(const SizedBox(height: 10));
+        rows.add(
+          Text(
+            'Last logged: ${_lastLoggedLabel(split.lastLoggedAt)}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: rows,
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: LinearProgressIndicator(minHeight: 2),
+      ),
+      error: (error, stackTrace) => Text(
+        'Could not load split summary.\nLast logged: ${_lastLoggedLabel(split.lastLoggedAt)}',
       ),
     );
   }
@@ -242,4 +342,24 @@ String _dayCountLabel(int dayCount) {
     return '1 day';
   }
   return '$dayCount days';
+}
+
+String _setCountLabel(int setCount) {
+  if (setCount == 1) {
+    return '1 set';
+  }
+  return '$setCount sets';
+}
+
+String _splitStatsLabel(int dayCount, int totalSets) {
+  return '${_dayCountLabel(dayCount)} | ${_setCountLabel(totalSets)}';
+}
+
+String _lastLoggedLabel(int? lastLoggedAtMs) {
+  if (lastLoggedAtMs == null) {
+    return 'Never';
+  }
+  return DateFormat('yyyy-MM-dd HH:mm').format(
+    DateTime.fromMillisecondsSinceEpoch(lastLoggedAtMs),
+  );
 }

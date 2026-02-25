@@ -78,6 +78,8 @@ class SplitSummary {
     required this.isActive,
     required this.dayCount,
     required this.updatedAt,
+    this.totalSets = 0,
+    this.lastLoggedAt,
   });
 
   final String id;
@@ -86,6 +88,8 @@ class SplitSummary {
   final bool isActive;
   final int dayCount;
   final int updatedAt;
+  final int totalSets;
+  final int? lastLoggedAt;
 }
 
 class SplitDetails {
@@ -314,53 +318,66 @@ class DriftSplitRepository implements SplitRepository {
 
   @override
   Stream<List<SplitSummary>> watchSplits() {
-    final query =
-        _db.select(_db.splits).join([
-          leftOuterJoin(
-            _db.dayPlans,
-            _db.dayPlans.splitId.equalsExp(_db.splits.id),
-          ),
-        ])..orderBy([
-          OrderingTerm.desc(_db.splits.updatedAt),
-          OrderingTerm.asc(_db.splits.name),
-          OrderingTerm.asc(_db.dayPlans.dayIndex),
-        ]);
+    final query = _db.customSelect(
+      '''
+      SELECT
+        s.id,
+        s.name,
+        s.schedule_mode,
+        s.is_active,
+        s.updated_at,
+        COALESCE(day_counts.day_count, 0) AS day_count,
+        COALESCE(set_counts.total_sets, 0) AS total_sets,
+        last_logs.last_logged_at
+      FROM splits s
+      LEFT JOIN (
+        SELECT split_id, COUNT(*) AS day_count
+        FROM day_plans
+        GROUP BY split_id
+      ) AS day_counts
+        ON day_counts.split_id = s.id
+      LEFT JOIN (
+        SELECT dp.split_id, COALESCE(SUM(pe.target_sets), 0) AS total_sets
+        FROM day_plans dp
+        LEFT JOIN planned_exercises pe
+          ON pe.day_plan_id = dp.id
+        GROUP BY dp.split_id
+      ) AS set_counts
+        ON set_counts.split_id = s.id
+      LEFT JOIN (
+        SELECT split_id, MAX(ended_at) AS last_logged_at
+        FROM workout_sessions
+        WHERE split_id IS NOT NULL
+          AND session_type = 'split_day'
+        GROUP BY split_id
+      ) AS last_logs
+        ON last_logs.split_id = s.id
+      ORDER BY s.updated_at DESC, s.name ASC
+      ''',
+      readsFrom: {
+        _db.splits,
+        _db.dayPlans,
+        _db.plannedExercises,
+        _db.workoutSessions,
+      },
+    );
 
-    return query.watch().map((rows) {
-      final grouped = <String, _SplitSummaryAccumulator>{};
-      for (final row in rows) {
-        final split = row.readTable(_db.splits);
-        final dayPlan = row.readTableOrNull(_db.dayPlans);
-
-        final entry = grouped.putIfAbsent(
-          split.id,
-          () => _SplitSummaryAccumulator(
-            id: split.id,
-            name: split.name,
-            scheduleMode: split.scheduleMode,
-            isActive: split.isActive,
-            updatedAt: split.updatedAt,
-          ),
-        );
-
-        if (dayPlan != null) {
-          entry.dayCount += 1;
-        }
-      }
-
-      return grouped.values
+    return query.watch().map(
+      (rows) => rows
           .map(
-            (entry) => SplitSummary(
-              id: entry.id,
-              name: entry.name,
-              scheduleMode: entry.scheduleMode,
-              isActive: entry.isActive,
-              dayCount: entry.dayCount,
-              updatedAt: entry.updatedAt,
+            (row) => SplitSummary(
+              id: row.read<String>('id'),
+              name: row.read<String>('name'),
+              scheduleMode: row.read<String>('schedule_mode'),
+              isActive: row.read<int>('is_active') != 0,
+              dayCount: row.read<int>('day_count'),
+              updatedAt: row.read<int>('updated_at'),
+              totalSets: row.read<int>('total_sets'),
+              lastLoggedAt: row.read<int?>('last_logged_at'),
             ),
           )
-          .toList(growable: false);
-    });
+          .toList(growable: false),
+    );
   }
 
   @override
@@ -532,21 +549,4 @@ class DriftSplitRepository implements SplitRepository {
       }
     }
   }
-}
-
-class _SplitSummaryAccumulator {
-  _SplitSummaryAccumulator({
-    required this.id,
-    required this.name,
-    required this.scheduleMode,
-    required this.isActive,
-    required this.updatedAt,
-  });
-
-  final String id;
-  final String name;
-  final String scheduleMode;
-  final bool isActive;
-  final int updatedAt;
-  int dayCount = 0;
 }

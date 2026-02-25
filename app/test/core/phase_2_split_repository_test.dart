@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:training_log_app/core/db/app_database.dart';
@@ -286,6 +287,85 @@ void main() {
     expect(summaries, hasLength(2));
     expect(summaries.first.id, secondSplitId);
     expect(summaries.last.id, firstSplitId);
+  });
+
+  test('watchSplits includes total planned sets and last logged timestamp', () async {
+    final exercises = await _seedExercises(exerciseRepository);
+
+    nowMs = DateTime(2026, 2, 20, 9, 0).millisecondsSinceEpoch;
+    final splitId = await splitRepository.createSplit(
+      SplitDraftInput(
+        name: 'Upper A/B',
+        days: [
+          DayPlanDraftInput(
+            dayIndex: 1,
+            title: 'Upper A',
+            plannedExercises: [
+              PlannedExerciseDraftInput(
+                orderIndex: 1,
+                exerciseId: exercises[0].id,
+                targetSets: 3,
+                repMin: 6,
+                repMax: 10,
+              ),
+              PlannedExerciseDraftInput(
+                orderIndex: 2,
+                exerciseId: exercises[1].id,
+                targetSets: 2,
+                repMin: 8,
+                repMax: 12,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    final otherSplitId = await _createMinimalSplit(splitRepository, exercises[2].id);
+
+    await database.into(database.workoutSessions).insert(
+      WorkoutSessionsCompanion.insert(
+        id: 'session_1',
+        sessionType: 'split_day',
+        splitId: Value(splitId),
+        dayIndex: const Value(1),
+        sessionName: const Value('Upper A'),
+        startedAt: 1000,
+        endedAt: 2000,
+      ),
+    );
+    await database.into(database.workoutSessions).insert(
+      WorkoutSessionsCompanion.insert(
+        id: 'session_2',
+        sessionType: 'split_day',
+        splitId: Value(splitId),
+        dayIndex: const Value(1),
+        sessionName: const Value('Upper A'),
+        startedAt: 3000,
+        endedAt: 4000,
+      ),
+    );
+    await database.into(database.workoutSessions).insert(
+      WorkoutSessionsCompanion.insert(
+        id: 'session_3',
+        sessionType: 'free',
+        splitId: Value(splitId),
+        dayIndex: const Value(1),
+        sessionName: const Value('Ignored'),
+        startedAt: 5000,
+        endedAt: 6000,
+      ),
+    );
+
+    final summaries = await splitRepository.watchSplits().first;
+    final summaryById = {for (final summary in summaries) summary.id: summary};
+
+    expect(summaryById[splitId], isNotNull);
+    expect(summaryById[splitId]!.totalSets, 5);
+    expect(summaryById[splitId]!.lastLoggedAt, 4000);
+
+    expect(summaryById[otherSplitId], isNotNull);
+    expect(summaryById[otherSplitId]!.totalSets, 3);
+    expect(summaryById[otherSplitId]!.lastLoggedAt, isNull);
   });
 
   test('setActiveSplit ensures exactly one active split', () async {
