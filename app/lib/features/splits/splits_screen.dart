@@ -12,6 +12,13 @@ class SplitsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final splitsState = ref.watch(splitsProvider);
+    final splitBuilderDraftState = ref.watch(
+      persistedSplitBuilderDraftProvider,
+    );
+    final hasSavedSplitDraft = splitBuilderDraftState.maybeWhen(
+      data: (draft) => draft != null,
+      orElse: () => false,
+    );
 
     return PopScope(
       canPop: false,
@@ -22,7 +29,44 @@ class SplitsScreen extends ConsumerWidget {
         context.go('/home');
       },
       child: splitsState.when(
-        data: (splits) => _SplitsContent(splits: splits),
+        data: (splits) => _SplitsContent(
+          splits: splits,
+          hasSavedSplitDraft: hasSavedSplitDraft,
+          onAddSplit: () async {
+            if (hasSavedSplitDraft) {
+              final shouldContinue = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Saved split draft found'),
+                  content: const Text(
+                    'There is already a saved split draft. If you continue, you will overwrite it and the draft will be lost. Do you want to continue?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                      child: const Text('Continue'),
+                    ),
+                  ],
+                ),
+              );
+              if (shouldContinue != true) {
+                return;
+              }
+              await ref.read(splitBuilderDraftStorageProvider).clearDraft();
+              ref.invalidate(persistedSplitBuilderDraftProvider);
+            }
+            await context.push('/splits/builder');
+            ref.invalidate(persistedSplitBuilderDraftProvider);
+          },
+          onContinueSplitDraft: () async {
+            await context.push('/splits/builder?resumeDraft=1');
+            ref.invalidate(persistedSplitBuilderDraftProvider);
+          },
+        ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _SplitsErrorState(
           message: 'Failed to load splits: $error',
@@ -34,12 +78,21 @@ class SplitsScreen extends ConsumerWidget {
 }
 
 class _SplitsContent extends StatelessWidget {
-  const _SplitsContent({required this.splits});
+  const _SplitsContent({
+    required this.splits,
+    required this.hasSavedSplitDraft,
+    required this.onAddSplit,
+    required this.onContinueSplitDraft,
+  });
 
   final List<SplitSummary> splits;
+  final bool hasSavedSplitDraft;
+  final Future<void> Function() onAddSplit;
+  final Future<void> Function() onContinueSplitDraft;
 
   @override
   Widget build(BuildContext context) {
+    final actionColor = Theme.of(context).colorScheme.primary;
     SplitSummary? activeSplit;
     for (final split in splits) {
       if (split.isActive) {
@@ -51,6 +104,26 @@ class _SplitsContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ActionChip(
+              key: const Key('splits_add_button'),
+              onPressed: onAddSplit,
+              avatar: Icon(Icons.add, size: 18, color: actionColor),
+              label: Text('ADD SPLIT', style: TextStyle(color: actionColor)),
+            ),
+            if (hasSavedSplitDraft)
+              OutlinedButton.icon(
+                key: const Key('splits_continue_building_split_button'),
+                onPressed: onContinueSplitDraft,
+                icon: const Icon(Icons.play_arrow_outlined),
+                label: const Text('Continue building split'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 20),
         const Text(
           'Current split',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
@@ -67,7 +140,7 @@ class _SplitsContent extends StatelessWidget {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
-               child: Text(
+              child: Text(
                 'No splits created yet. Tap ADD SPLIT to create your first split.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),

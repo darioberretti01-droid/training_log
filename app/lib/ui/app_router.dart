@@ -58,7 +58,11 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: 'builder',
-              builder: (context, state) => const SplitBuilderScreen(),
+              builder: (context, state) {
+                final resumeDraft =
+                    state.uri.queryParameters['resumeDraft'] == '1';
+                return SplitBuilderScreen(resumeDraft: resumeDraft);
+              },
             ),
             GoRoute(
               path: ':splitId',

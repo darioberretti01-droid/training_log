@@ -1,23 +1,34 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/state/providers.dart';
+import '../../core/time/app_clock.dart';
+import 'split_builder_draft.dart';
+import 'split_builder_draft_storage.dart';
 import 'split_repository.dart';
 import 'split_volume.dart';
 import 'split_volume_widgets.dart';
 
 class SplitBuilderScreen extends ConsumerStatefulWidget {
-  const SplitBuilderScreen({super.key, this.editingSplitId});
+  const SplitBuilderScreen({
+    super.key,
+    this.editingSplitId,
+    this.resumeDraft = false,
+  });
 
   final String? editingSplitId;
+  final bool resumeDraft;
 
   @override
   ConsumerState<SplitBuilderScreen> createState() => _SplitBuilderScreenState();
 }
 
-class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
+class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _splitNameController = TextEditingController();
   final List<_DayDraft> _days = [_DayDraft()];
   final List<String> _selectedVolumeControlLabels = [
@@ -26,16 +37,46 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
   final Set<String> _manuallyCreatedControlLabels = {};
   bool _setAsActive = true;
   bool _isSaving = false;
+  bool _didSaveSplit = false;
   bool _didHydrateFromExisting = false;
+  bool _didResumeFromDraft = false;
+  bool _isInitializingDraft = true;
   String? _validationMessage;
+  late AppClock _appClock;
+  late SplitBuilderDraftStorage _splitBuilderDraftStorage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _appClock = ref.read(appClockProvider);
+    _splitBuilderDraftStorage = ref.read(splitBuilderDraftStorageProvider);
+    _initializeDraftState();
+  }
 
   @override
   void dispose() {
+    if (!_didSaveSplit) {
+      _saveDraftForResume(invalidateProvider: false);
+    }
+    WidgetsBinding.instance.removeObserver(this);
     _splitNameController.dispose();
     for (final day in _days) {
       day.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_didSaveSplit) {
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _saveDraftForResume();
+    }
   }
 
   @override
@@ -45,60 +86,74 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
         ? ref.watch(splitDetailsProvider(widget.editingSplitId!))
         : const AsyncValue<SplitDetails?>.data(null);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Split' : 'Split Builder'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilledButton(
-              key: const Key('split_builder_save'),
-              onPressed: _isSaving ? null : _save,
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Save'),
+    return PopScope(
+      canPop: !_isSaving,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop && !_didSaveSplit) {
+          _saveDraftForResume();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(isEditing ? 'Edit Split' : 'Split Builder'),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton(
+                key: const Key('split_builder_save'),
+                onPressed: _isSaving ? null : _save,
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save'),
+              ),
             ),
-          ),
-        ],
-      ),
-      body: splitDetailsState.when(
-        data: (details) {
-          if (isEditing) {
-            if (details == null) {
-              return _BuilderErrorState(
-                message: 'Split not found.',
-                onRetry: () {
-                  ref.invalidate(splitDetailsProvider(widget.editingSplitId!));
-                },
-              );
-            }
-
-            if (!_didHydrateFromExisting) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted || _didHydrateFromExisting) {
-                  return;
-                }
-                _hydrateFromSplitDetails(details);
-              });
-              return const Center(child: CircularProgressIndicator());
-            }
-          }
-
-          return _buildSeedAndExercisesBody();
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _BuilderErrorState(
-          message: 'Failed to load split details: $error',
-          onRetry: () {
-            if (widget.editingSplitId != null) {
-              ref.invalidate(splitDetailsProvider(widget.editingSplitId!));
-            }
-          },
+          ],
         ),
+        body: _isInitializingDraft
+            ? const Center(child: CircularProgressIndicator())
+            : splitDetailsState.when(
+                data: (details) {
+                  if (isEditing) {
+                    if (details == null) {
+                      return _BuilderErrorState(
+                        message: 'Split not found.',
+                        onRetry: () {
+                          ref.invalidate(
+                            splitDetailsProvider(widget.editingSplitId!),
+                          );
+                        },
+                      );
+                    }
+
+                    if (!_didHydrateFromExisting) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted || _didHydrateFromExisting) {
+                          return;
+                        }
+                        _hydrateFromSplitDetails(details);
+                      });
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                  }
+
+                  return _buildSeedAndExercisesBody();
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => _BuilderErrorState(
+                  message: 'Failed to load split details: $error',
+                  onRetry: () {
+                    if (widget.editingSplitId != null) {
+                      ref.invalidate(
+                        splitDetailsProvider(widget.editingSplitId!),
+                      );
+                    }
+                  },
+                ),
+              ),
       ),
     );
   }
@@ -147,6 +202,76 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
               !exercise.isHidden || selectedExerciseIds.contains(exercise.id),
         )
         .toList(growable: false);
+  }
+
+  Future<void> _initializeDraftState() async {
+    if (widget.editingSplitId != null || !widget.resumeDraft) {
+      _isInitializingDraft = false;
+      return;
+    }
+
+    final storedDraft = await _splitBuilderDraftStorage.loadDraft();
+    if (!mounted) {
+      return;
+    }
+    if (storedDraft != null) {
+      _didResumeFromDraft = true;
+      _hydrateFromDraft(storedDraft);
+    }
+
+    setState(() {
+      _isInitializingDraft = false;
+    });
+  }
+
+  void _hydrateFromDraft(SplitBuilderDraft draft) {
+    _splitNameController.text = draft.splitName;
+    _setAsActive = draft.setAsActive;
+
+    _selectedVolumeControlLabels
+      ..clear()
+      ..addAll(
+        normalizeSplitVolumeControlLabels(draft.selectedVolumeControlLabels),
+      );
+    if (_selectedVolumeControlLabels.isEmpty) {
+      _selectedVolumeControlLabels.addAll(defaultSplitVolumeControlLabels);
+    }
+
+    _manuallyCreatedControlLabels
+      ..clear()
+      ..addAll(
+        normalizeSplitVolumeControlLabels(draft.manuallyCreatedControlLabels),
+      );
+
+    for (final day in _days) {
+      day.dispose();
+    }
+    _days.clear();
+    for (final day in draft.days) {
+      final plannedExercises = day.plannedExercises
+          .map(
+            (planned) => _PlannedExerciseDraft(
+              selectedExerciseId: planned.selectedExerciseId,
+              sets: planned.sets,
+              repMin: planned.repMin,
+              repMax: planned.repMax,
+              rest: planned.rest,
+              rpe: planned.rpe,
+            ),
+          )
+          .toList(growable: false);
+      _days.add(
+        _DayDraft(
+          title: day.title,
+          plannedExercises: plannedExercises.isEmpty
+              ? <_PlannedExerciseDraft>[_PlannedExerciseDraft()]
+              : plannedExercises,
+        ),
+      );
+    }
+    if (_days.isEmpty) {
+      _days.add(_DayDraft());
+    }
   }
 
   void _hydrateFromSplitDetails(SplitDetails details) {
@@ -377,6 +502,124 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
     setState(() {});
   }
 
+  void _saveDraftForResume({bool invalidateProvider = true}) {
+    if (widget.editingSplitId != null) {
+      return;
+    }
+    if (_isInitializingDraft) {
+      return;
+    }
+
+    if (!_hasDraftableInput()) {
+      if (!_didResumeFromDraft) {
+        return;
+      }
+      if (invalidateProvider) {
+        ref.invalidate(persistedSplitBuilderDraftProvider);
+      }
+      unawaited(_splitBuilderDraftStorage.clearDraft());
+      return;
+    }
+
+    final draft = SplitBuilderDraft(
+      splitName: _splitNameController.text.trim(),
+      setAsActive: _setAsActive,
+      selectedVolumeControlLabels: List<String>.from(
+        _selectedVolumeControlLabels,
+      ),
+      manuallyCreatedControlLabels: List<String>.from(
+        _manuallyCreatedControlLabels,
+      ),
+      updatedAtMs: _appClock().millisecondsSinceEpoch,
+      days: _days
+          .map(
+            (day) => SplitBuilderDayDraft(
+              title: day.titleController.text.trim(),
+              plannedExercises: day.plannedExercises
+                  .map(
+                    (planned) => SplitBuilderPlannedExerciseDraft(
+                      selectedExerciseId: planned.selectedExerciseId,
+                      sets: planned.targetSetsController.text.trim(),
+                      repMin: planned.repMinController.text.trim(),
+                      repMax: planned.repMaxController.text.trim(),
+                      rest: planned.restSecondsController.text.trim(),
+                      rpe: planned.targetRpeController.text.trim(),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          )
+          .toList(growable: false),
+    );
+    if (invalidateProvider) {
+      ref.invalidate(persistedSplitBuilderDraftProvider);
+    }
+    unawaited(_splitBuilderDraftStorage.saveDraft(draft));
+  }
+
+  bool _hasDraftableInput() {
+    if (_splitNameController.text.trim().isNotEmpty) {
+      return true;
+    }
+    if (!_setAsActive) {
+      return true;
+    }
+
+    final normalizedSelectedLabels = normalizeSplitVolumeControlLabels(
+      _selectedVolumeControlLabels,
+    );
+    final normalizedDefaults = normalizeSplitVolumeControlLabels(
+      defaultSplitVolumeControlLabels,
+    );
+    if (!_unorderedListEquals(normalizedSelectedLabels, normalizedDefaults)) {
+      return true;
+    }
+    if (_manuallyCreatedControlLabels.isNotEmpty) {
+      return true;
+    }
+
+    if (_days.length > 1) {
+      return true;
+    }
+
+    for (final day in _days) {
+      if (day.titleController.text.trim().isNotEmpty) {
+        return true;
+      }
+      if (day.plannedExercises.length > 1) {
+        return true;
+      }
+      for (final planned in day.plannedExercises) {
+        final selectedExerciseId = planned.selectedExerciseId;
+        if (selectedExerciseId != null && selectedExerciseId.isNotEmpty) {
+          return true;
+        }
+        if (planned.targetSetsController.text.trim() != '3' ||
+            planned.repMinController.text.trim() != '8' ||
+            planned.repMaxController.text.trim() != '12' ||
+            planned.restSecondsController.text.trim().isNotEmpty ||
+            planned.targetRpeController.text.trim().isNotEmpty) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool _unorderedListEquals(List<String> left, List<String> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    final leftSorted = [...left]..sort();
+    final rightSorted = [...right]..sort();
+    for (var index = 0; index < leftSorted.length; index++) {
+      if (leftSorted[index] != rightSorted[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<void> _save() async {
     _clearValidation();
     final input = _parseInput();
@@ -401,6 +644,9 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen> {
 
       ref.invalidate(splitsProvider);
       ref.invalidate(splitDetailsProvider(splitId));
+      _didSaveSplit = true;
+      ref.invalidate(persistedSplitBuilderDraftProvider);
+      await _splitBuilderDraftStorage.clearDraft();
 
       if (!mounted) {
         return;

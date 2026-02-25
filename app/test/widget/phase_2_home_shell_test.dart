@@ -1,10 +1,14 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:training_log_app/app.dart';
+import 'package:training_log_app/core/db/app_database.dart';
 import 'package:training_log_app/core/models/exercise_with_labels.dart';
 import 'package:training_log_app/core/state/providers.dart';
+import 'package:training_log_app/features/splits/split_builder_draft.dart';
+import 'package:training_log_app/features/splits/split_builder_draft_storage.dart';
 import 'package:training_log_app/features/splits/split_repository.dart';
 
 void main() {
@@ -41,6 +45,10 @@ void main() {
     expect(find.text('Push Pull Legs'), findsOneWidget);
     expect(find.byKey(const Key('splits_add_button')), findsOneWidget);
     expect(find.text('ADD SPLIT'), findsOneWidget);
+    expect(
+      find.byKey(const Key('splits_continue_building_split_button')),
+      findsNothing,
+    );
   });
 
   testWidgets('splits add button opens split builder', (tester) async {
@@ -80,6 +88,128 @@ void main() {
 
     expect(find.text('Split Builder'), findsOneWidget);
   });
+
+  testWidgets('splits add button warns before overwriting saved split draft', (
+    tester,
+  ) async {
+    const savedDraft = SplitBuilderDraft(
+      splitName: 'Saved draft',
+      setAsActive: true,
+      selectedVolumeControlLabels: ['chest'],
+      manuallyCreatedControlLabels: [],
+      days: [],
+      updatedAtMs: 1,
+    );
+    final draftDb = AppDatabase(NativeDatabase.memory());
+    addTearDown(draftDb.close);
+    final draftStorage = SplitBuilderDraftStorage(draftDb);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (count, error) => null,
+        overrides: [
+          splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
+          persistedSplitBuilderDraftProvider.overrideWith(
+            (ref) async => savedDraft,
+          ),
+          splitBuilderDraftStorageProvider.overrideWithValue(draftStorage),
+          recentHomeSessionsProvider.overrideWith((ref) async => const []),
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith(
+            (ref) => Stream.value(const [
+              ExerciseWithLabels(
+                id: 'bench_press',
+                name: 'Barbell Bench Press',
+                labels: ['push', 'chest'],
+              ),
+            ]),
+          ),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
+        ],
+        child: const TrainingLogApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.view_week_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('splits_add_button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'There is already a saved split draft. If you continue, you will overwrite it and the draft will be lost. Do you want to continue?',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Current split'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('splits_add_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Split Builder'), findsOneWidget);
+  });
+
+  testWidgets(
+    'splits tab shows continue building split only when draft exists',
+    (tester) async {
+      const savedDraft = SplitBuilderDraft(
+        splitName: 'Saved draft',
+        setAsActive: true,
+        selectedVolumeControlLabels: ['chest'],
+        manuallyCreatedControlLabels: [],
+        days: [],
+        updatedAtMs: 1,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          retry: (count, error) => null,
+          overrides: [
+            seedDataProvider.overrideWith((ref) async {}),
+            exercisesProvider.overrideWith((ref) => Stream.value(const [])),
+            splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
+            persistedSplitBuilderDraftProvider.overrideWith(
+              (ref) async => savedDraft,
+            ),
+            recentHomeSessionsProvider.overrideWith((ref) async => const []),
+            lastHomeSessionProvider.overrideWith((ref) async => null),
+            lastSplitDaySessionProvider.overrideWith((ref) async => null),
+            suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+            activeSplitDetailsProvider.overrideWith((ref) async => null),
+            activeSplitProvider.overrideWith(
+              (ref) => const AsyncValue.data(null),
+            ),
+          ],
+          child: const TrainingLogApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.view_week_outlined));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('splits_continue_building_split_button')),
+        findsOneWidget,
+      );
+      expect(find.text('Continue building split'), findsOneWidget);
+    },
+  );
 
   testWidgets('back from splits root returns to home', (tester) async {
     await tester.pumpWidget(

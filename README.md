@@ -54,6 +54,31 @@ Convenience wrappers:
 - `scripts\windows\stop_app.ps1`
 - `scripts\windows\app_status.ps1`
 
+## UI Previews (GitHub)
+Yes, GitHub renders images from relative repo paths.  
+These previews are stored in `app/screenshots/current/`.
+
+| Home | Logger |
+| --- | --- |
+| ![Home next workout](app/screenshots/current/home_next_workout.png) | ![Logger split day initial](app/screenshots/current/logger_split_day_initial.png) |
+| ![Home keep logging today](app/screenshots/current/exercises_list.png) | ![Logger exercise picker](app/screenshots/current/labels_catalog.png) |
+
+Full catalog: `docs/05_screenshots.md`
+
+## Repository Structure
+- `app/` Flutter app source
+- `docs/` roadmap, architecture, changelog, screenshot index
+- `scripts/windows/` setup and screenshot helper scripts
+- `.github/workflows/` CI workflows
+- `AGENT.md` contributor guardrails
+
+## Docs Map
+- `docs/01_environment_setup.md` - Windows setup walkthrough
+- `docs/02_long_term_plan.md` - roadmap and phase tracking
+- `docs/03_codebase_guide.md` - architecture, data model, key flows
+- `docs/04_change_log.md` - implementation notes by commit
+- `docs/05_screenshots.md` - auto-generated screenshot index
+
 ## Screenshot Automation + Demo Fixtures
 From repository root (PowerShell):
 
@@ -72,28 +97,3 @@ Developer-only controls in app:
 - `Other` tab -> `Debug tools`:
   - `Reset + seed demo data`
   - `Reset all data`
-
-## UI Previews (GitHub)
-Yes, GitHub renders images from relative repo paths.  
-These previews are stored in `app/screenshots/current/`.
-
-| Home | Logger |
-| --- | --- |
-| ![Home next workout](app/screenshots/current/home_next_workout.png) | ![Logger split day initial](app/screenshots/current/logger_split_day_initial.png) |
-| ![Home keep logging today](app/screenshots/current/home_keep_logging_today.png) | ![Logger exercise picker](app/screenshots/current/logger_exercise_picker_open.png) |
-
-Full catalog: `docs/05_screenshots.md`
-
-## Repository Structure
-- `app/` Flutter app source
-- `docs/` roadmap, architecture, changelog, screenshot index
-- `scripts/windows/` setup and screenshot helper scripts
-- `.github/workflows/` CI workflows
-- `AGENT.md` contributor guardrails
-
-## Docs Map
-- `docs/01_environment_setup.md` - Windows setup walkthrough
-- `docs/02_long_term_plan.md` - roadmap and phase tracking
-- `docs/03_codebase_guide.md` - architecture, data model, key flows
-- `docs/04_change_log.md` - implementation notes by commit
-- `docs/05_screenshots.md` - auto-generated screenshot index

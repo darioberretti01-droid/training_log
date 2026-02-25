@@ -213,6 +213,13 @@ class AppDatabase extends _$AppDatabase {
         'updated_at INTEGER NOT NULL'
         ')',
       );
+      await customStatement(
+        'CREATE TABLE IF NOT EXISTS split_builder_drafts ('
+        'id TEXT PRIMARY KEY, '
+        'payload TEXT NOT NULL, '
+        'updated_at INTEGER NOT NULL'
+        ')',
+      );
     },
   );
 }

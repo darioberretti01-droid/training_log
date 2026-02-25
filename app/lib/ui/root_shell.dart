@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class RootShell extends StatelessWidget {
-  const RootShell({
-    required this.state,
-    required this.child,
-    super.key,
-  });
+  const RootShell({required this.state, required this.child, super.key});
 
   final GoRouterState state;
   final Widget child;
@@ -19,10 +15,7 @@ class RootShell extends StatelessWidget {
 
     return Scaffold(
       appBar: isTabRoot
-          ? AppBar(
-              title: Text(_titleForIndex(selectedIndex)),
-              actions: _actionsForIndex(selectedIndex, context),
-            )
+          ? AppBar(title: Text(_titleForIndex(selectedIndex)))
           : null,
       body: child,
       bottomNavigationBar: NavigationBar(
@@ -92,27 +85,5 @@ class RootShell extends StatelessWidget {
       default:
         return '/home';
     }
-  }
-
-  List<Widget>? _actionsForIndex(int index, BuildContext context) {
-    if (index == 1) {
-      final actionColor = Theme.of(context).colorScheme.primary;
-      return [
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: ActionChip(
-            key: const Key('splits_add_button'),
-            avatar: Icon(Icons.add, size: 18, color: actionColor),
-            label: Text(
-              'ADD SPLIT',
-              style: TextStyle(color: actionColor),
-            ),
-            onPressed: () => context.push('/splits/builder'),
-          ),
-        ),
-      ];
-    }
-
-    return null;
   }
 }

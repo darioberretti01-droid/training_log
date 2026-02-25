@@ -8,6 +8,8 @@ import '../time/app_clock.dart';
 import '../../devtools/demo_fixture_service.dart';
 import '../../features/exercises/exercise_repository.dart';
 import '../../features/home/home_workout_logic.dart';
+import '../../features/splits/split_builder_draft.dart';
+import '../../features/splits/split_builder_draft_storage.dart';
 import '../../features/splits/split_repository.dart';
 import '../../features/workouts/workout_draft.dart';
 import '../../features/workouts/workout_draft_storage.dart';
@@ -291,6 +293,12 @@ final workoutDraftStorageProvider = Provider<WorkoutDraftStorage>((ref) {
   return WorkoutDraftStorage(ref.watch(appDatabaseProvider));
 });
 
+final splitBuilderDraftStorageProvider = Provider<SplitBuilderDraftStorage>((
+  ref,
+) {
+  return SplitBuilderDraftStorage(ref.watch(appDatabaseProvider));
+});
+
 final demoFixtureServiceProvider = Provider<DemoFixtureService>((ref) {
   return DemoFixtureService(
     appDb: ref.watch(appDatabaseProvider),
@@ -302,6 +310,12 @@ final demoFixtureServiceProvider = Provider<DemoFixtureService>((ref) {
 
 final persistedWorkoutDraftProvider = FutureProvider<WorkoutDraft?>((ref) {
   return ref.watch(workoutDraftStorageProvider).loadDraft();
+});
+
+final persistedSplitBuilderDraftProvider = FutureProvider<SplitBuilderDraft?>((
+  ref,
+) {
+  return ref.watch(splitBuilderDraftStorageProvider).loadDraft();
 });
 
 final effectiveWorkoutDraftProvider = Provider<WorkoutDraft?>((ref) {

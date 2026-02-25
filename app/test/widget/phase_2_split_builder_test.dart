@@ -1,9 +1,13 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:training_log_app/core/db/app_database.dart';
 import 'package:training_log_app/core/models/exercise_with_labels.dart';
 import 'package:training_log_app/core/state/providers.dart';
+import 'package:training_log_app/features/splits/split_builder_draft.dart';
+import 'package:training_log_app/features/splits/split_builder_draft_storage.dart';
 import 'package:training_log_app/features/splits/split_builder_screen.dart';
 import 'package:training_log_app/features/splits/split_repository.dart';
 
@@ -166,6 +170,9 @@ void main() {
           ),
         ],
       );
+    final draftDatabase = AppDatabase(NativeDatabase.memory());
+    addTearDown(draftDatabase.close);
+    final draftStorage = SplitBuilderDraftStorage(draftDatabase);
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -188,6 +195,7 @@ void main() {
             ]),
           ),
           splitRepositoryProvider.overrideWithValue(repository),
+          splitBuilderDraftStorageProvider.overrideWithValue(draftStorage),
         ],
         child: const MaterialApp(
           home: SplitBuilderScreen(editingSplitId: 'split_1'),
@@ -225,7 +233,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('split_builder_save')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
     expect(repository.updateCalls, 1);
     expect(repository.lastUpdatedSplitId, 'split_1');
@@ -245,12 +254,117 @@ void main() {
     );
     expect(repository.createCalls, 0);
   });
+
+  testWidgets('split builder resumeDraft restores saved draft values', (
+    tester,
+  ) async {
+    final repository = _FakeSplitRepository();
+    final database = AppDatabase(NativeDatabase.memory());
+    final storage = SplitBuilderDraftStorage(database);
+    await storage.saveDraft(
+      const SplitBuilderDraft(
+        splitName: 'Saved split draft',
+        setAsActive: true,
+        selectedVolumeControlLabels: ['back', 'chest'],
+        manuallyCreatedControlLabels: ['forearms'],
+        updatedAtMs: 1,
+        days: [
+          SplitBuilderDayDraft(
+            title: 'Day from draft',
+            plannedExercises: [
+              SplitBuilderPlannedExerciseDraft(
+                selectedExerciseId: 'bench_press',
+                sets: '4',
+                repMin: '6',
+                repMax: '10',
+                rest: '120',
+                rpe: '8',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith(
+            (ref) => Stream.value(const [
+              ExerciseWithLabels(
+                id: 'bench_press',
+                name: 'Barbell Bench Press',
+                labels: ['push', 'chest'],
+              ),
+            ]),
+          ),
+          splitRepositoryProvider.overrideWithValue(repository),
+          splitBuilderDraftStorageProvider.overrideWithValue(storage),
+        ],
+        child: const MaterialApp(home: SplitBuilderScreen(resumeDraft: true)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saved split draft'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('day_1_exercise_1')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byKey(const Key('day_1_exercise_1')), findsOneWidget);
+  });
+
+  testWidgets('split builder persists draft when leaving screen', (
+    tester,
+  ) async {
+    final repository = _FakeSplitRepository();
+    final database = AppDatabase(NativeDatabase.memory());
+    final storage = SplitBuilderDraftStorage(database);
+
+    await _pumpSplitBuilder(
+      tester,
+      repository,
+      storage: storage,
+      resumeDraft: false,
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('split_name_field')),
+      'Draft to persist',
+    );
+    await tester.enterText(find.byKey(const Key('day_1_title')), 'Draft day');
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    final loaded = await storage.loadDraft();
+    expect(loaded, isNotNull);
+    expect(loaded!.splitName, 'Draft to persist');
+    expect(loaded.days.first.title, 'Draft day');
+  });
 }
 
 Future<void> _pumpSplitBuilder(
   WidgetTester tester,
-  _FakeSplitRepository repository,
-) async {
+  _FakeSplitRepository repository, {
+  SplitBuilderDraftStorage? storage,
+  bool resumeDraft = false,
+}) async {
+  AppDatabase? ownedDatabase;
+  final effectiveStorage =
+      storage ??
+      (() {
+        ownedDatabase = AppDatabase(NativeDatabase.memory());
+        return SplitBuilderDraftStorage(ownedDatabase!);
+      })();
+  if (ownedDatabase != null) {
+    addTearDown(ownedDatabase!.close);
+  }
+
   await tester.binding.setSurfaceSize(const Size(800, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
@@ -267,8 +381,9 @@ Future<void> _pumpSplitBuilder(
           ]),
         ),
         splitRepositoryProvider.overrideWithValue(repository),
+        splitBuilderDraftStorageProvider.overrideWithValue(effectiveStorage),
       ],
-      child: const MaterialApp(home: SplitBuilderScreen()),
+      child: MaterialApp(home: SplitBuilderScreen(resumeDraft: resumeDraft)),
     ),
   );
   await tester.pumpAndSettle();
