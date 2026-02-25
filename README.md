@@ -54,8 +54,7 @@ Convenience wrappers:
 - `scripts\windows\stop_app.ps1`
 - `scripts\windows\app_status.ps1`
 
-## UI Previews (GitHub)
-Yes, GitHub renders images from relative repo paths.  
+## UI Previews (GitHub) 
 These previews are stored in `app/screenshots/current/`.
 
 | Home | Logger |
