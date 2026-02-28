@@ -11,6 +11,7 @@ import '../../core/models/exercise_with_labels.dart';
 import '../../core/models/logged_set_input.dart';
 import '../../core/state/providers.dart';
 import '../../core/time/app_clock.dart';
+import '../exercises/exercise_list_screen.dart';
 import '../splits/split_repository.dart';
 import 'quick_workout_repository.dart';
 import 'workout_draft.dart';
@@ -409,18 +410,23 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
       return;
     }
     _isOpeningPicker = true;
-    final selected = await _openExercisePicker();
-    _isOpeningPicker = false;
+    ExerciseWithLabels? selected;
+    try {
+      selected = await _openExercisePicker();
+    } finally {
+      _isOpeningPicker = false;
+    }
     if (!mounted || selected == null) {
       return;
     }
+    final pickedExercise = selected;
 
     setState(() {
       _exercises.add(
         _WorkoutExerciseState(
-          exerciseId: selected.id,
-          exerciseName: selected.name,
-          labels: selected.labels,
+          exerciseId: pickedExercise.id,
+          exerciseName: pickedExercise.name,
+          labels: pickedExercise.labels,
           repMin: 8,
           repMax: 12,
           targetSets: 1,
@@ -432,7 +438,9 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
   }
 
   Future<void> _handleSwapExercise(int exerciseIndex) async {
-    final selected = await _openExercisePicker();
+    final selected = await _openExercisePicker(
+      selectedExerciseId: _exercises[exerciseIndex].exerciseId,
+    );
     if (!mounted || selected == null) {
       return;
     }
@@ -445,14 +453,14 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     });
   }
 
-  Future<ExerciseWithLabels?> _openExercisePicker() {
-    return showModalBottomSheet<ExerciseWithLabels>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => const FractionallySizedBox(
-        heightFactor: 0.92,
-        child: _ExercisePickerSheet(),
+  Future<ExerciseWithLabels?> _openExercisePicker({
+    String? selectedExerciseId,
+  }) {
+    return Navigator.of(context).push<ExerciseWithLabels>(
+      MaterialPageRoute(
+        builder: (context) => _WorkoutExercisePickerScreen(
+          selectedExerciseId: selectedExerciseId,
+        ),
       ),
     );
   }
@@ -1283,123 +1291,35 @@ class _NumericField extends StatelessWidget {
   }
 }
 
-class _ExercisePickerSheet extends ConsumerStatefulWidget {
-  const _ExercisePickerSheet();
+class _WorkoutExercisePickerScreen extends ConsumerWidget {
+  const _WorkoutExercisePickerScreen({this.selectedExerciseId});
+
+  final String? selectedExerciseId;
 
   @override
-  ConsumerState<_ExercisePickerSheet> createState() =>
-      _ExercisePickerSheetState();
-}
-
-class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
-  final TextEditingController _searchController = TextEditingController();
-  String _query = '';
-  String? _selectedLabel;
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final exercisesState = ref.watch(exercisesProvider);
-    final labelsState = ref.watch(allLabelsProvider);
+    return exercisesState.when(
+      data: (exercises) {
+        final visibleExercises = exercises
+            .where(
+              (exercise) =>
+                  !exercise.isHidden || exercise.id == selectedExerciseId,
+            )
+            .toList(growable: false);
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 8,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        return ExerciseSelectionScreen(
+          exercises: visibleExercises,
+          selectedExerciseId: selectedExerciseId,
+        );
+      },
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Choose exercise')),
+        body: const Center(child: CircularProgressIndicator()),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Add exercise', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _searchController,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'Search exercise',
-              prefixIcon: Icon(Icons.search),
-            ),
-            onChanged: (value) =>
-                setState(() => _query = value.trim().toLowerCase()),
-          ),
-          const SizedBox(height: 8),
-          labelsState.when(
-            data: (labels) {
-              return DropdownButtonFormField<String?>(
-                initialValue: _selectedLabel,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Filter by label',
-                  isDense: true,
-                ),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('All labels'),
-                  ),
-                  ...labels.map(
-                    (label) => DropdownMenuItem<String?>(
-                      value: label,
-                      child: Text(label),
-                    ),
-                  ),
-                ],
-                onChanged: (value) => setState(() => _selectedLabel = value),
-              );
-            },
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: exercisesState.when(
-              data: (exercises) {
-                final filtered = exercises
-                    .where((exercise) {
-                      if (exercise.isHidden) {
-                        return false;
-                      }
-                      if (_query.isNotEmpty &&
-                          !exercise.name.toLowerCase().contains(_query)) {
-                        return false;
-                      }
-                      if (_selectedLabel != null &&
-                          !exercise.labels.contains(_selectedLabel)) {
-                        return false;
-                      }
-                      return true;
-                    })
-                    .toList(growable: false);
-
-                if (filtered.isEmpty) {
-                  return const Center(child: Text('No exercises found.'));
-                }
-
-                return ListView.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final exercise = filtered[index];
-                    return ListTile(
-                      title: Text(exercise.name),
-                      subtitle: Text(exercise.labels.take(3).join(', ')),
-                      onTap: () => Navigator.of(context).pop(exercise),
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) =>
-                  Center(child: Text('Failed to load exercises: $error')),
-            ),
-          ),
-        ],
+      error: (error, _) => Scaffold(
+        appBar: AppBar(title: const Text('Choose exercise')),
+        body: Center(child: Text('Failed to load exercises: $error')),
       ),
     );
   }

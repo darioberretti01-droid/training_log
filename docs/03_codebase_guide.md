@@ -37,7 +37,7 @@ High-level shell:
   - `split_day` (`splitId`, `dayIndex`)
   - `free`
 - Split mode hydrates planned exercises from split day.
-- Free mode starts empty and supports exercise picker.
+- Free mode starts empty and uses the same full-screen exercise picker used by split builder.
 - Draft is persisted and resumed for same day.
 - Finish flow warns about unfilled sets before save.
 - Session save writes split metadata when applicable.
