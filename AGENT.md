@@ -63,3 +63,8 @@ When a user asks to "open/start the app" after code changes, use a fresh deploy 
    - `flutter run -d emulator-5554`
 4. Confirm app process exists after install (`adb shell pidof com.dario.training.training_log_app`).
 5. If a detached/background launch is required, still ensure one confirmed successful install happened first.
+
+## 9. Command Execution Safety
+- ALWAYS run commands with an explicit timeout.
+- For agent tool calls, always set `timeout_ms`; never run a command without it.
+- Prefer short, bounded timeouts first, then retry with a longer timeout only if needed.

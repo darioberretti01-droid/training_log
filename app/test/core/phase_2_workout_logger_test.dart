@@ -217,6 +217,37 @@ void main() {
     expect(sets.first.weightKg, 62.5);
   });
 
+  test('getSessionDetails keeps exercise execution order', () async {
+    await exerciseRepository.seedIfEmpty();
+    final seeded = await exerciseRepository.watchExercises().first;
+    final orderedByName = [...seeded]..sort((a, b) => a.name.compareTo(b.name));
+    final firstLogged = orderedByName.last;
+    final secondLogged = orderedByName.first;
+
+    final sessionId = await workoutRepository.saveWorkoutSession(
+      mode: WorkoutSessionMode.free,
+      startedAt: DateTime(2026, 2, 23, 10, 0),
+      endedAt: DateTime(2026, 2, 23, 10, 30),
+      exercises: [
+        WorkoutExerciseLogInput(
+          exerciseId: firstLogged.id,
+          sets: const [LoggedSetInput(reps: 8, weightKg: 60)],
+        ),
+        WorkoutExerciseLogInput(
+          exerciseId: secondLogged.id,
+          sets: const [LoggedSetInput(reps: 10, weightKg: 40)],
+        ),
+      ],
+    );
+
+    final details = await workoutRepository.getSessionDetails(sessionId);
+    expect(details, isNotNull);
+    expect(details!.exercises.map((exercise) => exercise.exerciseId).toList(), [
+      firstLogged.id,
+      secondLogged.id,
+    ]);
+  });
+
   test('deleteWorkoutSession removes session and sets', () async {
     await exerciseRepository.seedIfEmpty();
     final exercises = await exerciseRepository.watchExercises().first;

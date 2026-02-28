@@ -22,7 +22,8 @@ class SessionDetailScreen extends ConsumerStatefulWidget {
 class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
   final TextEditingController _sessionNameController = TextEditingController();
   final List<_SessionExerciseEditState> _exerciseStates = [];
-  String? _hydratedSessionId;
+  String? _hydratedStateToken;
+  bool _isEditing = false;
   bool _isSaving = false;
   bool _isDeleting = false;
 
@@ -50,34 +51,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('Session Overview'),
-            actions: [
-              IconButton(
-                key: const Key('session_detail_delete'),
-                tooltip: 'Delete session',
-                onPressed: _isSaving || _isDeleting ? null : _deleteSession,
-                icon: _isDeleting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.delete_outline),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilledButton(
-                  key: const Key('session_detail_save'),
-                  onPressed: _isSaving || _isDeleting ? null : _saveChanges,
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Save'),
-                ),
-              ),
-            ],
+            actions: _buildAppBarActions(details),
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
@@ -90,6 +64,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
               TextField(
                 key: const Key('session_detail_name'),
                 controller: _sessionNameController,
+                readOnly: !_isEditing,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   labelText: 'Session name',
@@ -102,6 +77,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _SessionExerciseCard(
                     exercise: _exerciseStates[exerciseIndex],
+                    isEditing: _isEditing,
                     onAddSet: () => _addSet(exerciseIndex),
                     onDeleteLastSet: () => _deleteLastSet(exerciseIndex),
                   ),
@@ -120,12 +96,68 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
     );
   }
 
+  List<Widget> _buildAppBarActions(WorkoutSessionDetails details) {
+    if (_isEditing) {
+      return [
+        IconButton(
+          key: const Key('session_detail_discard'),
+          tooltip: 'Discard edits',
+          onPressed: _isSaving ? null : () => _discardChanges(details),
+          icon: const Icon(Icons.close),
+        ),
+        IconButton(
+          key: const Key('session_detail_save'),
+          tooltip: 'Save',
+          onPressed: _isSaving ? null : _saveChanges,
+          icon: _isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save_outlined),
+        ),
+      ];
+    }
+
+    return [
+      IconButton(
+        key: const Key('session_detail_edit'),
+        tooltip: 'Edit session',
+        onPressed: _isSaving || _isDeleting
+            ? null
+            : () => setState(() => _isEditing = true),
+        icon: const Icon(Icons.edit_outlined),
+      ),
+      IconButton(
+        key: const Key('session_detail_delete'),
+        tooltip: 'Delete session',
+        onPressed: _isSaving || _isDeleting ? null : _deleteSession,
+        icon: _isDeleting
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.delete_outline),
+      ),
+    ];
+  }
+
   void _hydrateIfNeeded(WorkoutSessionDetails details) {
-    if (_hydratedSessionId == details.session.id) {
+    if (_isEditing) {
       return;
     }
-    _hydratedSessionId = details.session.id;
+    final stateToken =
+        '${details.session.id}:${details.session.endedAt}:${details.totalSets}';
+    if (_hydratedStateToken == stateToken) {
+      return;
+    }
+    _hydrate(details);
+    _hydratedStateToken = stateToken;
+  }
 
+  void _hydrate(WorkoutSessionDetails details) {
     for (final exercise in _exerciseStates) {
       exercise.dispose();
     }
@@ -156,6 +188,9 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
   }
 
   void _addSet(int exerciseIndex) {
+    if (!_isEditing) {
+      return;
+    }
     final exercise = _exerciseStates[exerciseIndex];
     final previous = exercise.rows.isEmpty ? null : exercise.rows.last;
     exercise.rows.add(
@@ -169,14 +204,50 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
     setState(() {});
   }
 
-  void _deleteLastSet(int exerciseIndex) {
+  Future<void> _deleteLastSet(int exerciseIndex) async {
+    if (!_isEditing) {
+      return;
+    }
     final exercise = _exerciseStates[exerciseIndex];
     if (exercise.rows.length <= 1) {
       return;
     }
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete set?'),
+        content: Text(
+          'Remove set ${exercise.rows.length} from ${exercise.exerciseName}?',
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Cancel',
+            onPressed: () => Navigator.of(context).pop(false),
+            icon: const Icon(Icons.close),
+          ),
+          IconButton(
+            tooltip: 'Confirm',
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.check),
+          ),
+        ],
+      ),
+    );
+    if (shouldDelete != true || !mounted) {
+      return;
+    }
+
     final removed = exercise.rows.removeLast();
     removed.dispose();
     setState(() {});
+  }
+
+  void _discardChanges(WorkoutSessionDetails details) {
+    _hydrate(details);
+    _hydratedStateToken =
+        '${details.session.id}:${details.session.endedAt}:${details.totalSets}';
+    setState(() => _isEditing = false);
   }
 
   Future<void> _saveChanges() async {
@@ -254,6 +325,10 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       if (!mounted) {
         return;
       }
+      setState(() {
+        _isEditing = false;
+        _hydratedStateToken = null;
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Session updated.')));
@@ -276,13 +351,15 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
         title: const Text('Delete session?'),
         content: const Text('This will permanently delete the workout record.'),
         actions: [
-          TextButton(
+          IconButton(
+            tooltip: 'Cancel',
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            icon: const Icon(Icons.close),
           ),
-          FilledButton(
+          IconButton(
+            tooltip: 'Delete',
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            icon: const Icon(Icons.delete_outline),
           ),
         ],
       ),
@@ -368,11 +445,13 @@ class _SessionSummaryCard extends StatelessWidget {
 class _SessionExerciseCard extends StatelessWidget {
   const _SessionExerciseCard({
     required this.exercise,
+    required this.isEditing,
     required this.onAddSet,
     required this.onDeleteLastSet,
   });
 
   final _SessionExerciseEditState exercise;
+  final bool isEditing;
   final VoidCallback onAddSet;
   final VoidCallback onDeleteLastSet;
 
@@ -396,28 +475,30 @@ class _SessionExerciseCard extends StatelessWidget {
                 child: _SessionSetRow(
                   setNumber: index + 1,
                   row: exercise.rows[index],
+                  enabled: isEditing,
                 ),
               ),
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
+            if (isEditing)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    key: Key('session_detail_add_set_${exercise.exerciseId}'),
+                    tooltip: 'Add set',
                     onPressed: onAddSet,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add set'),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
+                  IconButton(
+                    key: Key(
+                      'session_detail_delete_set_${exercise.exerciseId}',
+                    ),
+                    tooltip: 'Delete last set',
                     onPressed: onDeleteLastSet,
                     icon: const Icon(Icons.delete_outline),
-                    label: const Text('Delete set'),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
         ),
       ),
@@ -426,10 +507,15 @@ class _SessionExerciseCard extends StatelessWidget {
 }
 
 class _SessionSetRow extends StatelessWidget {
-  const _SessionSetRow({required this.setNumber, required this.row});
+  const _SessionSetRow({
+    required this.setNumber,
+    required this.row,
+    required this.enabled,
+  });
 
   final int setNumber;
   final _SessionSetEditState row;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -441,6 +527,7 @@ class _SessionSetRow extends StatelessWidget {
             controller: row.weightController,
             label: 'Weight',
             decimal: true,
+            enabled: enabled,
           ),
         ),
         const SizedBox(width: 6),
@@ -449,6 +536,7 @@ class _SessionSetRow extends StatelessWidget {
             controller: row.repsController,
             label: 'Reps',
             decimal: false,
+            enabled: enabled,
           ),
         ),
         const SizedBox(width: 6),
@@ -457,6 +545,7 @@ class _SessionSetRow extends StatelessWidget {
             controller: row.restController,
             label: 'Rest',
             decimal: false,
+            enabled: enabled,
           ),
         ),
         const SizedBox(width: 6),
@@ -465,6 +554,7 @@ class _SessionSetRow extends StatelessWidget {
             controller: row.rpeController,
             label: 'RPE',
             decimal: true,
+            enabled: enabled,
           ),
         ),
       ],
@@ -477,16 +567,19 @@ class _SessionNumberField extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.decimal,
+    required this.enabled,
   });
 
   final TextEditingController controller;
   final String label;
   final bool decimal;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      readOnly: !enabled,
       keyboardType: TextInputType.numberWithOptions(decimal: decimal),
       inputFormatters: decimal
           ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]

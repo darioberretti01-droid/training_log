@@ -530,41 +530,61 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
       return null;
     }
 
-    final rows =
-        await (_db.select(_db.performedSets).join([
-                innerJoin(
-                  _db.exercises,
-                  _db.exercises.id.equalsExp(_db.performedSets.exerciseId),
-                ),
-              ])
-              ..where(_db.performedSets.sessionId.equals(sessionId))
-              ..orderBy([
-                OrderingTerm.asc(_db.exercises.name),
-                OrderingTerm.asc(_db.performedSets.exerciseId),
-                OrderingTerm.asc(_db.performedSets.setIndex),
-              ]))
-            .get();
+    final rows = await _db
+        .customSelect(
+          '''
+          SELECT
+            ps.exercise_id,
+            e.name AS exercise_name,
+            ps.set_index,
+            ps.reps,
+            ps.weight_kg,
+            ps.rest_seconds,
+            ps.rpe
+          FROM performed_sets ps
+          INNER JOIN exercises e
+            ON e.id = ps.exercise_id
+          INNER JOIN (
+            SELECT exercise_id, MIN(rowid) AS first_rowid
+            FROM performed_sets
+            WHERE session_id = ?
+            GROUP BY exercise_id
+          ) ord
+            ON ord.exercise_id = ps.exercise_id
+          WHERE ps.session_id = ?
+          ORDER BY
+            ord.first_rowid ASC,
+            ps.set_index ASC,
+            ps.rowid ASC
+          ''',
+          variables: [
+            Variable.withString(sessionId),
+            Variable.withString(sessionId),
+          ],
+          readsFrom: {_db.performedSets, _db.exercises},
+        )
+        .get();
 
     final grouped = <String, _SessionExerciseAccumulator>{};
     final orderedExerciseIds = <String>[];
 
     for (final row in rows) {
-      final set = row.readTable(_db.performedSets);
-      final exercise = row.readTable(_db.exercises);
-      final entry = grouped.putIfAbsent(exercise.id, () {
-        orderedExerciseIds.add(exercise.id);
+      final exerciseId = row.read<String>('exercise_id');
+      final exerciseName = row.read<String>('exercise_name');
+      final entry = grouped.putIfAbsent(exerciseId, () {
+        orderedExerciseIds.add(exerciseId);
         return _SessionExerciseAccumulator(
-          exerciseId: exercise.id,
-          exerciseName: exercise.name,
+          exerciseId: exerciseId,
+          exerciseName: exerciseName,
         );
       });
       entry.sets.add(
         WorkoutSessionSetDetails(
-          setIndex: set.setIndex,
-          reps: set.reps,
-          weightKg: set.weightKg,
-          restSeconds: set.restSeconds,
-          rpe: set.rpe,
+          setIndex: row.read<int>('set_index'),
+          reps: row.read<int>('reps'),
+          weightKg: row.read<double>('weight_kg'),
+          restSeconds: row.readNullable<int>('rest_seconds'),
+          rpe: row.readNullable<double>('rpe'),
         ),
       );
     }
