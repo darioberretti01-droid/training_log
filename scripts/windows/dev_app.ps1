@@ -206,14 +206,32 @@ function Get-AdbDeviceIds() {
     return @()
   }
 
-  $output = & adb devices 2>$null
-  if ($LASTEXITCODE -ne 0) {
+  $originalErrorPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $output = @(& adb devices 2>&1)
+    $exitCode = $LASTEXITCODE
+
+    $outputText = ($output | ForEach-Object { [string]$_ }) -join "`n"
+    $daemonBooting = $outputText -match "daemon not running|daemon started successfully"
+
+    if ($daemonBooting -or $exitCode -ne 0) {
+      & adb start-server 2>&1 | Out-Null
+      $output = @(& adb devices 2>&1)
+      $exitCode = $LASTEXITCODE
+    }
+  } finally {
+    $ErrorActionPreference = $originalErrorPreference
+  }
+
+  if ($exitCode -ne 0) {
     return @()
   }
 
   $result = @()
   foreach ($line in $output) {
-    if ($line -match "^([^\s]+)\s+device$") {
+    $normalized = ([string]$line).Trim()
+    if ($normalized -match "^([^\s]+)\s+device$") {
       $result += $matches[1]
     }
   }
