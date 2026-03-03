@@ -220,7 +220,7 @@ const screenshotManifest = <ScreenshotManifestEntry>[
     scenario: DemoFixtureScenario.baseRealistic,
     captureStep: ScreenshotCaptureStep.loggerExercisePickerOpen,
     routeGroup: 'logger',
-    notes: 'Free workout exercise picker bottom sheet.',
+    notes: 'Free workout full-screen exercise picker.',
   ),
   ScreenshotManifestEntry(
     id: 'logger_finish_unfilled_warning',

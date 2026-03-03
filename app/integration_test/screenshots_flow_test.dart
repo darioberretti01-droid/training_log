@@ -103,8 +103,7 @@ Future<void> _runCaptureStep(
       return;
     case ScreenshotCaptureStep.splitBuilder:
       await _goToSplitsTab(tester);
-      await tester.tap(find.byKey(const Key('splits_add_button')));
-      await tester.pumpAndSettle();
+      await _openSplitBuilderFromSplits(tester);
       return;
     case ScreenshotCaptureStep.exercisesList:
       await _goToExercisesTab(tester);
@@ -188,8 +187,7 @@ Future<void> _runCaptureStep(
       return;
     case ScreenshotCaptureStep.splitBuilderExercisePickerOpen:
       await _goToSplitsTab(tester);
-      await tester.tap(find.byKey(const Key('splits_add_button')));
-      await tester.pumpAndSettle();
+      await _openSplitBuilderFromSplits(tester);
       final dayExerciseDropdown = find.byKey(const Key('day_1_exercise_1'));
       await tester.ensureVisible(dayExerciseDropdown.first);
       await tester.tap(dayExerciseDropdown.first, warnIfMissed: false);
@@ -259,6 +257,17 @@ Future<void> _goToExercisesTab(WidgetTester tester) async {
 Future<void> _goToOtherTab(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.more_horiz));
   await tester.pumpAndSettle();
+}
+
+Future<void> _openSplitBuilderFromSplits(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('splits_add_button')));
+  await tester.pumpAndSettle();
+
+  final continueButton = find.widgetWithText(FilledButton, 'Continue');
+  if (continueButton.evaluate().isNotEmpty) {
+    await tester.tap(continueButton.first);
+    await tester.pumpAndSettle();
+  }
 }
 
 Future<void> _openExerciseHistory(WidgetTester tester) async {
