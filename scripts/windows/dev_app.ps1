@@ -168,10 +168,16 @@ function Set-ActiveState(
   [bool]$FreshValue,
   [string]$RotatedLog
 ) {
+  $onlineIds = @(Get-AdbDeviceIds)
+  $normalizedDeviceId = Normalize-DeviceId -Candidate $DeviceIdValue -OnlineIds $onlineIds
+  if ([string]::IsNullOrWhiteSpace($normalizedDeviceId)) {
+    $normalizedDeviceId = $DeviceIdValue
+  }
+
   $State.active.pid = $RunnerProcessId
   $State.active.startedAt = (Get-Date).ToString("s")
   $State.active.mode = $Mode
-  $State.active.deviceId = $DeviceIdValue
+  $State.active.deviceId = $normalizedDeviceId
   $State.active.fresh = $FreshValue
   $State.active.rotatedLog = $RotatedLog
   $State.latestLog = $LatestLogPath
@@ -296,6 +302,38 @@ function Select-PreferredDevice([string[]]$Ids) {
   return $Ids[0]
 }
 
+function Normalize-DeviceId([string]$Candidate, [string[]]$OnlineIds) {
+  if ([string]::IsNullOrWhiteSpace($Candidate)) {
+    return $null
+  }
+
+  $trimmed = $Candidate.Trim()
+  $online = @($OnlineIds)
+
+  if ($online.Count -eq 0) {
+    return $trimmed
+  }
+  if ($online -contains $trimmed) {
+    return $trimmed
+  }
+
+  foreach ($onlineId in $online) {
+    if ($trimmed.Contains($onlineId)) {
+      return $onlineId
+    }
+  }
+
+  $emulatorMatch = [Regex]::Match($trimmed, "emulator-\d+")
+  if ($emulatorMatch.Success) {
+    $matchedId = $emulatorMatch.Value
+    if ($online -contains $matchedId) {
+      return $matchedId
+    }
+  }
+
+  return $null
+}
+
 function Wait-ForAndroidBoot([int]$TimeoutSeconds = 240) {
   if (-not (Has-Command "adb")) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -356,10 +394,11 @@ function Invoke-AdbForceStop([string]$TargetDevice) {
   if ($online.Count -eq 0) {
     return
   }
-  if ([string]::IsNullOrWhiteSpace($TargetDevice)) {
+  $resolvedDevice = Normalize-DeviceId -Candidate $TargetDevice -OnlineIds $online
+  if ([string]::IsNullOrWhiteSpace($resolvedDevice)) {
     & adb shell am force-stop $PackageId 2>$null 1>$null
   } else {
-    & adb -s $TargetDevice shell am force-stop $PackageId 2>$null 1>$null
+    & adb -s $resolvedDevice shell am force-stop $PackageId 2>$null 1>$null
   }
 }
 
@@ -371,10 +410,11 @@ function Invoke-AdbUninstall([string]$TargetDevice) {
   if ($online.Count -eq 0) {
     return
   }
-  if ([string]::IsNullOrWhiteSpace($TargetDevice)) {
+  $resolvedDevice = Normalize-DeviceId -Candidate $TargetDevice -OnlineIds $online
+  if ([string]::IsNullOrWhiteSpace($resolvedDevice)) {
     & adb uninstall $PackageId 2>$null 1>$null
   } else {
-    & adb -s $TargetDevice uninstall $PackageId 2>$null 1>$null
+    & adb -s $resolvedDevice uninstall $PackageId 2>$null 1>$null
   }
 }
 
@@ -383,11 +423,13 @@ function Get-AppPid([string]$TargetDevice) {
     return $null
   }
   try {
+    $online = @(Get-AdbDeviceIds)
+    $resolvedDevice = Normalize-DeviceId -Candidate $TargetDevice -OnlineIds $online
     $processPid = ""
-    if ([string]::IsNullOrWhiteSpace($TargetDevice)) {
+    if ([string]::IsNullOrWhiteSpace($resolvedDevice)) {
       $processPid = (& adb shell pidof $PackageId 2>$null | Out-String).Trim()
     } else {
-      $processPid = (& adb -s $TargetDevice shell pidof $PackageId 2>$null | Out-String).Trim()
+      $processPid = (& adb -s $resolvedDevice shell pidof $PackageId 2>$null | Out-String).Trim()
     }
     if ([string]::IsNullOrWhiteSpace($processPid)) {
       return $null
@@ -438,6 +480,7 @@ function Invoke-Start([switch]$IsRestart) {
 
   Ensure-Flutter
   $targetDevice = Ensure-DeviceOnline
+  $targetDevice = Normalize-DeviceId -Candidate $targetDevice -OnlineIds @(Get-OnlineAndroidDeviceIds)
   if ([string]::IsNullOrWhiteSpace($targetDevice)) {
     throw "No target device resolved."
   }
@@ -517,7 +560,11 @@ function Invoke-Stop() {
   Stop-TrackedProcess -State $state
   Stop-OrphanRunnerProcesses
 
-  $deviceForStop = [string]$state.active.deviceId
+  $onlineIds = @(Get-AdbDeviceIds)
+  $deviceForStop = Normalize-DeviceId -Candidate ([string]$state.active.deviceId) -OnlineIds $onlineIds
+  if ([string]::IsNullOrWhiteSpace($deviceForStop) -and $onlineIds.Count -gt 0) {
+    $deviceForStop = Select-PreferredDevice -Ids $onlineIds
+  }
   Invoke-AdbForceStop -TargetDevice $deviceForStop
   Clear-ActiveState -State $state
   Write-Info "Runner stopped."
@@ -545,9 +592,13 @@ function Invoke-Status() {
     $runnerAlive = Test-ProcessAlive -RunnerProcessId $activePid
   }
 
-  $activeDevice = [string]$state.active.deviceId
+  $activeDevice = Normalize-DeviceId -Candidate ([string]$state.active.deviceId) -OnlineIds $deviceIds
   if ([string]::IsNullOrWhiteSpace($activeDevice) -and $deviceIds.Count -gt 0) {
     $activeDevice = Select-PreferredDevice -Ids $deviceIds
+  }
+  if ($activeDevice -ne $state.active.deviceId -and -not [string]::IsNullOrWhiteSpace($activeDevice)) {
+    $state.active.deviceId = $activeDevice
+    Save-State -State $state
   }
   $appPid = Get-AppPid -TargetDevice $activeDevice
 
