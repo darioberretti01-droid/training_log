@@ -353,19 +353,6 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            if (widget.mode == WorkoutSessionMode.free) ...[
-              Row(
-                children: [
-                  FilledButton.icon(
-                    key: const Key('workout_logger_add_exercise'),
-                    onPressed: _handleAddExercise,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add exercise'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
             if (_exercises.isEmpty)
               Card(
                 child: Padding(
@@ -399,6 +386,19 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                 ),
               ),
             ),
+            if (widget.mode == WorkoutSessionMode.free) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  FilledButton.icon(
+                    key: const Key('workout_logger_add_exercise'),
+                    onPressed: _handleAddExercise,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add exercise'),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
