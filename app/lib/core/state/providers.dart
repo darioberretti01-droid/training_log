@@ -129,6 +129,123 @@ class ExerciseHistoryLookup {
   int get hashCode => Object.hash(sessionLimit, Object.hashAll(exerciseIds));
 }
 
+@immutable
+class WorkoutLoggerReferenceLookup {
+  const WorkoutLoggerReferenceLookup({
+    required this.mode,
+    required this.orderedExerciseIds,
+    this.splitId,
+    this.dayIndex,
+  });
+
+  final String mode;
+  final String? splitId;
+  final int? dayIndex;
+  final List<String> orderedExerciseIds;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is WorkoutLoggerReferenceLookup &&
+        other.mode == mode &&
+        other.splitId == splitId &&
+        other.dayIndex == dayIndex &&
+        listEquals(other.orderedExerciseIds, orderedExerciseIds);
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(mode, splitId, dayIndex, Object.hashAll(orderedExerciseIds));
+}
+
+@immutable
+class WorkoutLoggerOccurrenceReference {
+  const WorkoutLoggerOccurrenceReference({
+    required this.exerciseId,
+    required this.occurrenceIndex,
+    required this.session,
+    required this.sets,
+  });
+
+  final String exerciseId;
+  final int occurrenceIndex;
+  final WorkoutLoggerReferenceSession session;
+  final List<WorkoutLoggerSetReference> sets;
+}
+
+@immutable
+class WorkoutLoggerOccurrenceKey {
+  const WorkoutLoggerOccurrenceKey({
+    required this.exerciseId,
+    required this.occurrenceIndex,
+  });
+
+  final String exerciseId;
+  final int occurrenceIndex;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is WorkoutLoggerOccurrenceKey &&
+        other.exerciseId == exerciseId &&
+        other.occurrenceIndex == occurrenceIndex;
+  }
+
+  @override
+  int get hashCode => Object.hash(exerciseId, occurrenceIndex);
+}
+
+@immutable
+class WorkoutLoggerResolvedReferences {
+  const WorkoutLoggerResolvedReferences({required this.occurrenceMap});
+
+  const WorkoutLoggerResolvedReferences.empty()
+    : occurrenceMap =
+          const <
+            WorkoutLoggerOccurrenceKey,
+            WorkoutLoggerOccurrenceReference
+          >{};
+
+  final Map<WorkoutLoggerOccurrenceKey, WorkoutLoggerOccurrenceReference>
+  occurrenceMap;
+
+  bool get isEmpty => occurrenceMap.isEmpty;
+
+  WorkoutLoggerOccurrenceReference? occurrenceFor({
+    required String exerciseId,
+    required int occurrenceIndex,
+  }) {
+    return occurrenceMap[WorkoutLoggerOccurrenceKey(
+      exerciseId: exerciseId,
+      occurrenceIndex: occurrenceIndex,
+    )];
+  }
+
+  WorkoutLoggerSetReference? setFor({
+    required String exerciseId,
+    required int occurrenceIndex,
+    required int setIndex,
+  }) {
+    final occurrence = occurrenceFor(
+      exerciseId: exerciseId,
+      occurrenceIndex: occurrenceIndex,
+    );
+    if (occurrence == null) {
+      return null;
+    }
+    for (final set in occurrence.sets) {
+      if (set.setIndex == setIndex) {
+        return set;
+      }
+    }
+    return null;
+  }
+}
+
 final bestSetByExerciseProvider = FutureProvider.family<PerformedSet?, String>((
   ref,
   exerciseId,
@@ -180,6 +297,82 @@ final recentSessionsByLookupProvider =
             lookup.exerciseIds,
             sessionLimit: lookup.sessionLimit,
           );
+    });
+
+final workoutLoggerReferencesProvider =
+    FutureProvider.family<
+      WorkoutLoggerResolvedReferences,
+      WorkoutLoggerReferenceLookup
+    >((ref, lookup) async {
+      if (lookup.orderedExerciseIds.isEmpty) {
+        return const WorkoutLoggerResolvedReferences.empty();
+      }
+
+      final repo = ref.watch(quickWorkoutRepositoryProvider);
+      final occurrences = <WorkoutLoggerOccurrenceReference>[];
+
+      if (lookup.mode == WorkoutSessionMode.splitDay) {
+        final splitId = lookup.splitId?.trim();
+        final dayIndex = lookup.dayIndex;
+        if (splitId == null ||
+            splitId.isEmpty ||
+            dayIndex == null ||
+            dayIndex <= 0) {
+          return const WorkoutLoggerResolvedReferences.empty();
+        }
+        final sessionReference = await repo.getLastSplitDayWorkoutReference(
+          splitId: splitId,
+          dayIndex: dayIndex,
+        );
+        if (sessionReference != null) {
+          final currentExerciseSet = lookup.orderedExerciseIds.toSet();
+          for (final occurrence in sessionReference.exerciseOccurrences) {
+            if (!currentExerciseSet.contains(occurrence.exerciseId)) {
+              continue;
+            }
+            occurrences.add(
+              WorkoutLoggerOccurrenceReference(
+                exerciseId: occurrence.exerciseId,
+                occurrenceIndex: occurrence.occurrenceIndex,
+                session: sessionReference.session,
+                sets: occurrence.sets,
+              ),
+            );
+          }
+        }
+      } else if (lookup.mode == WorkoutSessionMode.free) {
+        final references = await repo.getLatestSessionReferencesForExercises(
+          lookup.orderedExerciseIds,
+        );
+        for (final reference in references) {
+          for (final occurrence in reference.occurrences) {
+            occurrences.add(
+              WorkoutLoggerOccurrenceReference(
+                exerciseId: reference.exerciseId,
+                occurrenceIndex: occurrence.occurrenceIndex,
+                session: reference.session,
+                sets: occurrence.sets,
+              ),
+            );
+          }
+        }
+      } else {
+        return const WorkoutLoggerResolvedReferences.empty();
+      }
+
+      final map =
+          <WorkoutLoggerOccurrenceKey, WorkoutLoggerOccurrenceReference>{};
+      for (final occurrence in occurrences) {
+        map[WorkoutLoggerOccurrenceKey(
+              exerciseId: occurrence.exerciseId,
+              occurrenceIndex: occurrence.occurrenceIndex,
+            )] =
+            occurrence;
+      }
+
+      return WorkoutLoggerResolvedReferences(
+        occurrenceMap: Map.unmodifiable(map),
+      );
     });
 
 final recentHomeSessionsProvider =

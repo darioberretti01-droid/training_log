@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
-import '../../core/db/app_database.dart';
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/models/logged_set_input.dart';
 import '../../core/state/providers.dart';
@@ -298,6 +298,29 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     required String subtitle,
     required SplitDetails? splitDetails,
   }) {
+    final orderedExerciseIds = _exercises
+        .map((exercise) => exercise.exerciseId)
+        .toList(growable: false);
+    final referencesState = ref.watch(
+      workoutLoggerReferencesProvider(
+        WorkoutLoggerReferenceLookup(
+          mode: widget.mode,
+          splitId: widget.mode == WorkoutSessionMode.splitDay
+              ? widget.splitId
+              : null,
+          dayIndex: widget.mode == WorkoutSessionMode.splitDay
+              ? widget.dayIndex
+              : null,
+          orderedExerciseIds: orderedExerciseIds,
+        ),
+      ),
+    );
+    final references = referencesState.maybeWhen(
+      data: (value) => value,
+      orElse: WorkoutLoggerResolvedReferences.empty,
+    );
+    final occurrenceIndices = _buildExerciseOccurrenceIndices();
+
     return PopScope(
       canPop: !_isSaving,
       onPopInvokedWithResult: (didPop, _) {
@@ -372,6 +395,9 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                 child: _ExerciseCard(
                   key: Key('workout_exercise_card_$index'),
                   exercise: _exercises[index],
+                  occurrenceIndex: occurrenceIndices[index],
+                  references: references,
+                  showReferenceLoading: referencesState.isLoading,
                   onSwap: widget.mode == WorkoutSessionMode.splitDay
                       ? () => _handleSwapExercise(index)
                       : null,
@@ -981,11 +1007,26 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     _inMemoryDraft = null;
     _workoutDraftNotifier.clearDraft();
   }
+
+  List<int> _buildExerciseOccurrenceIndices() {
+    final occurrenceByExerciseId = <String, int>{};
+    final indices = <int>[];
+    for (final exercise in _exercises) {
+      final nextOccurrence =
+          (occurrenceByExerciseId[exercise.exerciseId] ?? 0) + 1;
+      occurrenceByExerciseId[exercise.exerciseId] = nextOccurrence;
+      indices.add(nextOccurrence);
+    }
+    return indices;
+  }
 }
 
-class _ExerciseCard extends ConsumerWidget {
+class _ExerciseCard extends StatelessWidget {
   const _ExerciseCard({
     required this.exercise,
+    required this.occurrenceIndex,
+    required this.references,
+    required this.showReferenceLoading,
     required this.onEditPrescription,
     required this.onCopyPreviousSet,
     required this.onAddSet,
@@ -997,6 +1038,9 @@ class _ExerciseCard extends ConsumerWidget {
   });
 
   final _WorkoutExerciseState exercise;
+  final int occurrenceIndex;
+  final WorkoutLoggerResolvedReferences references;
+  final bool showReferenceLoading;
   final VoidCallback? onSwap;
   final VoidCallback? onRemove;
   final VoidCallback onEditPrescription;
@@ -1006,10 +1050,11 @@ class _ExerciseCard extends ConsumerWidget {
   final VoidCallback onStartRestTimer;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lookup = ExerciseHistoryLookup(exerciseIds: [exercise.exerciseId]);
-    final lastSetState = ref.watch(lastSetByLookupProvider(lookup));
-    final bestSetState = ref.watch(bestSetByLookupProvider(lookup));
+  Widget build(BuildContext context) {
+    final occurrenceReference = references.occurrenceFor(
+      exerciseId: exercise.exerciseId,
+      occurrenceIndex: occurrenceIndex,
+    );
     final showProgressHint = _shouldShowProgressHint(exercise);
 
     return Card(
@@ -1070,11 +1115,22 @@ class _ExerciseCard extends ConsumerWidget {
               '${exercise.targetRpe == null ? '' : ' • RPE ${exercise.targetRpe}'}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 8),
-            _HistoryStrip(
-              lastSetState: lastSetState,
-              bestSetState: bestSetState,
-            ),
+            if (occurrenceReference != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _formatReferenceSummary(occurrenceReference.session),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              )
+            else if (showReferenceLoading)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Loading last workout...',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
             const SizedBox(height: 8),
             ...List.generate(
               exercise.rows.length,
@@ -1082,6 +1138,11 @@ class _ExerciseCard extends ConsumerWidget {
                 setNumber: rowIndex + 1,
                 row: exercise.rows[rowIndex],
                 repMin: exercise.repMin,
+                referenceSet: references.setFor(
+                  exerciseId: exercise.exerciseId,
+                  occurrenceIndex: occurrenceIndex,
+                  setIndex: rowIndex + 1,
+                ),
                 onCopyPrevious: rowIndex > 0
                     ? () => onCopyPreviousSet(rowIndex)
                     : null,
@@ -1144,46 +1205,16 @@ class _ExerciseCard extends ConsumerWidget {
     }
     return true;
   }
-}
 
-class _HistoryStrip extends StatelessWidget {
-  const _HistoryStrip({required this.lastSetState, required this.bestSetState});
-
-  final AsyncValue<PerformedSet?> lastSetState;
-  final AsyncValue<PerformedSet?> bestSetState;
-
-  @override
-  Widget build(BuildContext context) {
-    final lastText = lastSetState.maybeWhen(
-      data: (value) => value == null
-          ? 'Last: -'
-          : 'Last: ${value.weightKg.toStringAsFixed(1)} x ${value.reps}',
-      orElse: () => 'Last: -',
-    );
-    final bestText = bestSetState.maybeWhen(
-      data: (value) => value == null
-          ? 'Best (all-time): -'
-          : 'Best (all-time): ${value.weightKg.toStringAsFixed(1)} x ${value.reps}',
-      orElse: () => 'Best (all-time): -',
-    );
-    final suggested = lastSetState.maybeWhen(
-      data: (value) => value == null
-          ? 'Suggested load: -'
-          : 'Suggested load: ${value.weightKg}',
-      orElse: () => 'Suggested load: -',
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [Text(suggested), Text(lastText), Text(bestText)],
-      ),
-    );
+  String _formatReferenceSummary(WorkoutLoggerReferenceSession session) {
+    final sessionDate = DateFormat(
+      'MMM d, yyyy',
+    ).format(DateTime.fromMillisecondsSinceEpoch(session.startedAt));
+    final sessionLabel = session.sessionName?.trim();
+    if (sessionLabel == null || sessionLabel.isEmpty) {
+      return 'Reference: $sessionDate';
+    }
+    return 'Reference: $sessionLabel · $sessionDate';
   }
 }
 
@@ -1192,18 +1223,22 @@ class _SetRow extends StatelessWidget {
     required this.setNumber,
     required this.row,
     required this.repMin,
+    required this.referenceSet,
     this.onCopyPrevious,
   });
 
   final int setNumber;
   final _WorkoutSetState row;
   final int repMin;
+  final WorkoutLoggerSetReference? referenceSet;
   final VoidCallback? onCopyPrevious;
 
   @override
   Widget build(BuildContext context) {
     final reps = row.repsValue;
     final belowRangeHint = row.isLoggedSet && reps != null && reps < repMin;
+    final referenceHint = _buildReferenceHint();
+    final deltaHint = _buildDeltaHint(context);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1250,6 +1285,23 @@ class _SetRow extends StatelessWidget {
                 ),
             ],
           ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 2),
+            child: Text(
+              referenceHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          if (deltaHint != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 4, top: 2),
+              child: Text(
+                deltaHint.text,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: deltaHint.color),
+              ),
+            ),
           if (belowRangeHint)
             Padding(
               padding: const EdgeInsets.only(left: 4, top: 2),
@@ -1262,6 +1314,55 @@ class _SetRow extends StatelessWidget {
       ),
     );
   }
+
+  String _buildReferenceHint() {
+    final set = referenceSet;
+    if (set == null) {
+      return 'Last: -';
+    }
+    final rpeSuffix = set.rpe == null
+        ? ''
+        : ' · RPE ${set.rpe!.toStringAsFixed(1)}';
+    return 'Last: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}$rpeSuffix';
+  }
+
+  _SetDeltaHint? _buildDeltaHint(BuildContext context) {
+    final set = referenceSet;
+    if (set == null || !row.isLoggedSet) {
+      return null;
+    }
+    final currentWeight = row.weightValue;
+    final currentReps = row.repsValue;
+    if (currentWeight == null || currentReps == null) {
+      return null;
+    }
+
+    final currentVolume = currentWeight * currentReps;
+    final previousVolume = set.weightKg * set.reps;
+    final delta = currentVolume - previousVolume;
+    final roundedDelta = double.parse(delta.toStringAsFixed(1));
+    if (roundedDelta == 0) {
+      return _SetDeltaHint(
+        text: 'Vs last: matched',
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      );
+    }
+    final sign = roundedDelta > 0 ? '+' : '';
+    final color = roundedDelta > 0
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.tertiary;
+    return _SetDeltaHint(
+      text: 'Vs last: $sign$roundedDelta volume',
+      color: color,
+    );
+  }
+}
+
+class _SetDeltaHint {
+  const _SetDeltaHint({required this.text, required this.color});
+
+  final String text;
+  final Color color;
 }
 
 class _NumericField extends StatelessWidget {

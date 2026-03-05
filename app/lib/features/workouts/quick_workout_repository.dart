@@ -81,6 +81,14 @@ abstract class QuickWorkoutRepository {
   });
 
   Future<void> deleteWorkoutSession(String sessionId);
+
+  Future<WorkoutLoggerSessionReference?> getLastSplitDayWorkoutReference({
+    required String splitId,
+    required int dayIndex,
+  });
+
+  Future<List<WorkoutLoggerExerciseSessionReference>>
+  getLatestSessionReferencesForExercises(List<String> exerciseIds);
 }
 
 class ExerciseSessionHistoryEntry {
@@ -164,6 +172,68 @@ class WorkoutSessionSetDetails {
   final double weightKg;
   final int? restSeconds;
   final double? rpe;
+}
+
+class WorkoutLoggerReferenceSession {
+  const WorkoutLoggerReferenceSession({
+    required this.sessionId,
+    required this.sessionType,
+    required this.startedAt,
+    this.sessionName,
+  });
+
+  final String sessionId;
+  final String sessionType;
+  final int startedAt;
+  final String? sessionName;
+}
+
+class WorkoutLoggerSetReference {
+  const WorkoutLoggerSetReference({
+    required this.setIndex,
+    required this.reps,
+    required this.weightKg,
+    this.rpe,
+  });
+
+  final int setIndex;
+  final int reps;
+  final double weightKg;
+  final double? rpe;
+}
+
+class WorkoutLoggerExerciseOccurrenceReference {
+  const WorkoutLoggerExerciseOccurrenceReference({
+    required this.exerciseId,
+    required this.occurrenceIndex,
+    required this.sets,
+  });
+
+  final String exerciseId;
+  final int occurrenceIndex;
+  final List<WorkoutLoggerSetReference> sets;
+}
+
+class WorkoutLoggerSessionReference {
+  const WorkoutLoggerSessionReference({
+    required this.session,
+    required this.exerciseOccurrences,
+  });
+
+  final WorkoutLoggerReferenceSession session;
+  final List<WorkoutLoggerExerciseOccurrenceReference> exerciseOccurrences;
+}
+
+class WorkoutLoggerExerciseSessionReference {
+  const WorkoutLoggerExerciseSessionReference({
+    required this.exerciseId,
+    required this.session,
+    required this.occurrences,
+  });
+
+  final String exerciseId;
+  final WorkoutLoggerReferenceSession session;
+  final List<WorkoutLoggerExerciseOccurrenceReference> occurrences;
 }
 
 class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
@@ -701,6 +771,105 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
     }
   }
 
+  @override
+  Future<WorkoutLoggerSessionReference?> getLastSplitDayWorkoutReference({
+    required String splitId,
+    required int dayIndex,
+  }) async {
+    final normalizedSplitId = _normalizeOptionalString(splitId);
+    if (normalizedSplitId == null || dayIndex <= 0) {
+      return null;
+    }
+
+    final sessionRow = await _db
+        .customSelect(
+          '''
+          SELECT id, session_type, started_at, session_name
+          FROM workout_sessions
+          WHERE session_type = ?
+            AND split_id = ?
+            AND day_index = ?
+          ORDER BY started_at DESC, id DESC
+          LIMIT 1
+          ''',
+          variables: [
+            Variable.withString(WorkoutSessionMode.splitDay),
+            Variable.withString(normalizedSplitId),
+            Variable.withInt(dayIndex),
+          ],
+          readsFrom: {_db.workoutSessions},
+        )
+        .getSingleOrNull();
+    if (sessionRow == null) {
+      return null;
+    }
+
+    final session = WorkoutLoggerReferenceSession(
+      sessionId: sessionRow.read<String>('id'),
+      sessionType: sessionRow.read<String>('session_type'),
+      startedAt: sessionRow.read<int>('started_at'),
+      sessionName: sessionRow.readNullable<String>('session_name'),
+    );
+    final exerciseOccurrences = await _getSessionExerciseOccurrences(
+      session.sessionId,
+    );
+    return WorkoutLoggerSessionReference(
+      session: session,
+      exerciseOccurrences: exerciseOccurrences,
+    );
+  }
+
+  @override
+  Future<List<WorkoutLoggerExerciseSessionReference>>
+  getLatestSessionReferencesForExercises(List<String> exerciseIds) async {
+    final normalizedIds = _normalizeExerciseIds(exerciseIds);
+    if (normalizedIds.isEmpty) {
+      return const [];
+    }
+
+    final references = <WorkoutLoggerExerciseSessionReference>[];
+    for (final exerciseId in normalizedIds) {
+      final sessionRow = await _db
+          .customSelect(
+            '''
+            SELECT ws.id, ws.session_type, ws.started_at, ws.session_name
+            FROM workout_sessions ws
+            INNER JOIN performed_sets ps
+              ON ps.session_id = ws.id
+            WHERE ps.exercise_id = ?
+            ORDER BY ws.started_at DESC, ws.id DESC
+            LIMIT 1
+            ''',
+            variables: [Variable.withString(exerciseId)],
+            readsFrom: {_db.workoutSessions, _db.performedSets},
+          )
+          .getSingleOrNull();
+      if (sessionRow == null) {
+        continue;
+      }
+
+      final session = WorkoutLoggerReferenceSession(
+        sessionId: sessionRow.read<String>('id'),
+        sessionType: sessionRow.read<String>('session_type'),
+        startedAt: sessionRow.read<int>('started_at'),
+        sessionName: sessionRow.readNullable<String>('session_name'),
+      );
+      final occurrences = await _getSessionExerciseOccurrences(
+        session.sessionId,
+        exerciseIdFilter: exerciseId,
+      );
+      references.add(
+        WorkoutLoggerExerciseSessionReference(
+          exerciseId: exerciseId,
+          session: session,
+          occurrences: occurrences,
+        ),
+      );
+    }
+
+    return references;
+  }
+
   void _validateSet(LoggedSetInput set) {
     if (set.reps <= 0) {
       throw ArgumentError('Reps must be greater than zero.');
@@ -764,6 +933,88 @@ class DriftQuickWorkoutRepository implements QuickWorkoutRepository {
     }
     return unique.toList(growable: false);
   }
+
+  Future<List<WorkoutLoggerExerciseOccurrenceReference>>
+  _getSessionExerciseOccurrences(
+    String sessionId, {
+    String? exerciseIdFilter,
+  }) async {
+    final variables = <Variable<dynamic>>[Variable.withString(sessionId)];
+    final exerciseFilterClause = exerciseIdFilter == null
+        ? ''
+        : ' AND ps.exercise_id = ?';
+    if (exerciseIdFilter != null) {
+      variables.add(Variable.withString(exerciseIdFilter));
+    }
+
+    final rows = await _db
+        .customSelect(
+          '''
+          SELECT
+            ps.exercise_id,
+            ps.set_index,
+            ps.reps,
+            ps.weight_kg,
+            ps.rpe,
+            ps.rowid AS set_rowid
+          FROM performed_sets ps
+          WHERE ps.session_id = ?$exerciseFilterClause
+          ORDER BY ps.rowid ASC, ps.set_index ASC
+          ''',
+          variables: variables.cast<Variable<Object>>(),
+          readsFrom: {_db.performedSets},
+        )
+        .get();
+    if (rows.isEmpty) {
+      return const [];
+    }
+
+    final occurrenceCounts = <String, int>{};
+    final occurrences = <_OccurrenceAccumulator>[];
+    _OccurrenceAccumulator? current;
+    var previousExerciseId = '';
+    var previousSetIndex = 0;
+
+    for (final row in rows) {
+      final exerciseId = row.read<String>('exercise_id');
+      final setIndex = row.read<int>('set_index');
+      final startsNewOccurrence =
+          current == null ||
+          exerciseId != previousExerciseId ||
+          setIndex <= previousSetIndex;
+
+      if (startsNewOccurrence) {
+        final occurrenceIndex = (occurrenceCounts[exerciseId] ?? 0) + 1;
+        occurrenceCounts[exerciseId] = occurrenceIndex;
+        current = _OccurrenceAccumulator(
+          exerciseId: exerciseId,
+          occurrenceIndex: occurrenceIndex,
+        );
+        occurrences.add(current);
+      }
+
+      current.sets.add(
+        WorkoutLoggerSetReference(
+          setIndex: setIndex,
+          reps: row.read<int>('reps'),
+          weightKg: row.read<double>('weight_kg'),
+          rpe: row.readNullable<double>('rpe'),
+        ),
+      );
+      previousExerciseId = exerciseId;
+      previousSetIndex = setIndex;
+    }
+
+    return occurrences
+        .map(
+          (occurrence) => WorkoutLoggerExerciseOccurrenceReference(
+            exerciseId: occurrence.exerciseId,
+            occurrenceIndex: occurrence.occurrenceIndex,
+            sets: List.unmodifiable(occurrence.sets),
+          ),
+        )
+        .toList(growable: false);
+  }
 }
 
 class _SessionAccumulator {
@@ -802,4 +1053,15 @@ class _SessionExerciseAccumulator {
   final String exerciseId;
   final String exerciseName;
   final List<WorkoutSessionSetDetails> sets = [];
+}
+
+class _OccurrenceAccumulator {
+  _OccurrenceAccumulator({
+    required this.exerciseId,
+    required this.occurrenceIndex,
+  });
+
+  final String exerciseId;
+  final int occurrenceIndex;
+  final List<WorkoutLoggerSetReference> sets = [];
 }
