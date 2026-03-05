@@ -96,3 +96,30 @@ Developer-only controls in app:
 - `Other` tab -> `Debug tools`:
   - `Reset + seed demo data`
   - `Reset all data`
+
+## Dependency Maintenance Routine
+A dependency maintenance routine is a small, repeatable weekly process that keeps package updates manageable instead of letting upgrades pile up.
+
+What is now set up:
+- Weekly Dependabot PRs for `pub` dependencies in `/app` (Mondays at 09:00 Asia/Tokyo).
+- Local maintenance script: `scripts\windows\dependency_maintenance.ps1`.
+
+From repository root (PowerShell):
+
+```powershell
+# Check only (no upgrades)
+scripts\windows\dependency_maintenance.ps1 check
+
+# Weekly routine (recommended)
+scripts\windows\dependency_maintenance.ps1 update
+
+# Occasional major-version sweep
+scripts\windows\dependency_maintenance.ps1 major
+```
+
+Recommended cadence:
+- Weekly: run `update`, review tests/analyzer, merge small safe updates.
+- Monthly: run `major` on a branch and resolve breakages in isolation.
+
+
+
