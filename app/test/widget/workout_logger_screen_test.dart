@@ -10,6 +10,23 @@ import 'package:training_log_app/features/workouts/quick_workout_repository.dart
 import 'package:training_log_app/features/workouts/workout_logger_screen.dart';
 
 void main() {
+  testWidgets('free workout shows delete current log action', (tester) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(database)],
+        child: const MaterialApp(
+          home: WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('workout_logger_delete_log')), findsOneWidget);
+  });
+
   testWidgets(
     'free workout add exercise opens the same picker controls as split builder',
     (tester) async {

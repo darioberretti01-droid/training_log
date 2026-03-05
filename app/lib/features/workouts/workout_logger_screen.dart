@@ -328,7 +328,8 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                   ),
                 ),
               ),
-            if (widget.mode == WorkoutSessionMode.splitDay)
+            if (widget.mode == WorkoutSessionMode.splitDay ||
+                widget.mode == WorkoutSessionMode.free)
               IconButton(
                 key: const Key('workout_logger_delete_log'),
                 tooltip: 'Delete current log',
