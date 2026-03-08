@@ -14,8 +14,27 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+function Get-NativeWindowsPath([string]$PathValue) {
+  if ([string]::IsNullOrWhiteSpace($PathValue)) {
+    return $PathValue
+  }
+
+  $providerPrefix = "Microsoft.PowerShell.Core\FileSystem::"
+  $normalized = $PathValue
+  if ($normalized.StartsWith($providerPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $normalized = $normalized.Substring($providerPrefix.Length)
+  }
+  if ($normalized.StartsWith("\\?\UNC\", [System.StringComparison]::OrdinalIgnoreCase)) {
+    return "\\" + $normalized.Substring(8)
+  }
+  if ($normalized.StartsWith("\\?\", [System.StringComparison]::OrdinalIgnoreCase)) {
+    return $normalized.Substring(4)
+  }
+  return $normalized
+}
+
 $PackageId = "com.dario.training.training_log_app"
-$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$RepoRoot = Get-NativeWindowsPath -PathValue ((Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path)
 $ResolvedAppDir = Join-Path $RepoRoot $AppDir
 $RunnerDir = Join-Path $RepoRoot ".devrunner"
 $StatePath = Join-Path $RunnerDir "state.json"
@@ -36,6 +55,15 @@ function Write-WarnMsg([string]$Message) {
 
 function Write-ErrorMsg([string]$Message) {
   Write-Host "[dev-app] $Message" -ForegroundColor Red
+}
+
+function Invoke-InNativeRepoRoot([scriptblock]$ScriptBlock) {
+  Push-Location -LiteralPath $RepoRoot
+  try {
+    & $ScriptBlock
+  } finally {
+    Pop-Location
+  }
 }
 
 function Ensure-RunnerDir() {
@@ -537,6 +565,7 @@ flutter run -d '$targetDevice' 2>&1 | Tee-Object -FilePath '$LatestLogPath' -App
 "@
     $runner = Start-Process -FilePath "powershell.exe" `
       -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $innerScript) `
+      -WorkingDirectory $ResolvedAppDir `
       -WindowStyle Hidden `
       -PassThru
 
@@ -629,28 +658,30 @@ function Invoke-Logs() {
   Get-Content -LiteralPath $LatestLogPath -Tail $Tail -Wait
 }
 
-switch ($Command) {
-  "start" {
-    Invoke-Start
-    break
-  }
-  "restart" {
-    Invoke-Restart
-    break
-  }
-  "stop" {
-    Invoke-Stop
-    break
-  }
-  "status" {
-    Invoke-Status
-    break
-  }
-  "logs" {
-    Invoke-Logs
-    break
-  }
-  default {
-    throw "Unsupported command: $Command"
+Invoke-InNativeRepoRoot {
+  switch ($Command) {
+    "start" {
+      Invoke-Start
+      break
+    }
+    "restart" {
+      Invoke-Restart
+      break
+    }
+    "stop" {
+      Invoke-Stop
+      break
+    }
+    "status" {
+      Invoke-Status
+      break
+    }
+    "logs" {
+      Invoke-Logs
+      break
+    }
+    default {
+      throw "Unsupported command: $Command"
+    }
   }
 }
