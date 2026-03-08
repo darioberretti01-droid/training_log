@@ -9,6 +9,8 @@ import 'package:training_log_app/core/state/providers.dart';
 import 'package:training_log_app/features/workouts/quick_workout_repository.dart';
 import 'package:training_log_app/features/workouts/quick_workout_screen.dart';
 
+import '../test_helpers/localized_test_app.dart';
+
 void main() {
   testWidgets('quick workout shows inline validation and blocks save', (
     tester,
@@ -66,8 +68,8 @@ Future<void> _pumpQuickWorkout(
         }),
         quickWorkoutRepositoryProvider.overrideWithValue(repository),
       ],
-      child: const MaterialApp(
-        home: QuickWorkoutScreen(exerciseId: 'bench_press'),
+      child: localizedTestApp(
+        home: const QuickWorkoutScreen(exerciseId: 'bench_press'),
       ),
     ),
   );
@@ -165,4 +167,15 @@ class _FakeQuickWorkoutRepository implements QuickWorkoutRepository {
     }
     return 'session_1';
   }
+
+  @override
+  Future<WorkoutLoggerSessionReference?> getLastSplitDayWorkoutReference({
+    required String splitId,
+    required int dayIndex,
+  }) async => null;
+
+  @override
+  Future<List<WorkoutLoggerExerciseSessionReference>>
+  getLatestSessionReferencesForExercises(List<String> exerciseIds) async =>
+      const [];
 }

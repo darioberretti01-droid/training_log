@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../l10n/app_localizations.dart';
+
 class RootShell extends StatelessWidget {
   const RootShell({required this.state, required this.child, super.key});
 
@@ -15,22 +17,28 @@ class RootShell extends StatelessWidget {
 
     return Scaffold(
       appBar: isTabRoot
-          ? AppBar(title: Text(_titleForIndex(selectedIndex)))
+          ? AppBar(title: Text(_titleForIndex(context, selectedIndex)))
           : null,
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.view_week_outlined),
-            label: 'Splits',
+            icon: const Icon(Icons.home_outlined),
+            label: context.l10n.tr('Home'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.fitness_center_outlined),
-            label: 'Exercises',
+            icon: const Icon(Icons.view_week_outlined),
+            label: context.l10n.tr('Splits'),
           ),
-          NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Other'),
+          NavigationDestination(
+            icon: const Icon(Icons.fitness_center_outlined),
+            label: context.l10n.tr('Exercises'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.more_horiz),
+            label: context.l10n.tr('Other'),
+          ),
         ],
         onDestinationSelected: (index) => context.go(_pathForIndex(index)),
       ),
@@ -57,18 +65,18 @@ class RootShell extends StatelessWidget {
         location == '/other';
   }
 
-  String _titleForIndex(int index) {
+  String _titleForIndex(BuildContext context, int index) {
     switch (index) {
       case 0:
-        return 'Home';
+        return context.l10n.tr('Home');
       case 1:
-        return 'Splits';
+        return context.l10n.tr('Splits');
       case 2:
-        return 'Exercises';
+        return context.l10n.tr('Exercises');
       case 3:
-        return 'Other';
+        return context.l10n.tr('Other');
       default:
-        return 'Home';
+        return context.l10n.tr('Home');
     }
   }
 

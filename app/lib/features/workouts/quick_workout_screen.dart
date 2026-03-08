@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/logged_set_input.dart';
 import '../../core/state/providers.dart';
+import '../../l10n/app_localizations.dart';
 
 class QuickWorkoutScreen extends ConsumerStatefulWidget {
   const QuickWorkoutScreen({required this.exerciseId, super.key});
@@ -37,20 +38,25 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final exerciseState = ref.watch(exerciseByIdProvider(widget.exerciseId));
 
     return exerciseState.when(
       data: (exercise) {
         if (exercise == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Quick Log')),
-            body: const Center(child: Text('Exercise not found.')),
+            appBar: AppBar(title: Text(l10n.tr('Quick Log'))),
+            body: Center(child: Text(l10n.tr('Exercise not found.'))),
           );
         }
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('Quick Log: ${exercise.name}'),
+            title: Text(
+              l10n.format('Quick Log: {name}', {
+                'name': l10n.localizeExerciseName(exercise.name),
+              }),
+            ),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -63,7 +69,7 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Save'),
+                      : Text(l10n.tr('Save')),
                 ),
               ),
             ],
@@ -72,7 +78,9 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               Text(
-                'Enter reps and weight (kg) for each set. Rest and RPE are optional.',
+                l10n.tr(
+                  'Enter reps and weight (kg) for each set. Rest and RPE are optional.',
+                ),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               if (_validationMessage != null) ...[
@@ -108,7 +116,7 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
               OutlinedButton.icon(
                 onPressed: _addSet,
                 icon: const Icon(Icons.add),
-                label: const Text('Add Set'),
+                label: Text(l10n.tr('Add Set')),
               ),
             ],
           ),
@@ -117,8 +125,12 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
-        appBar: AppBar(title: const Text('Quick Log')),
-        body: Center(child: Text('Failed to load exercise: $error')),
+        appBar: AppBar(title: Text(l10n.tr('Quick Log'))),
+        body: Center(
+          child: Text(
+            l10n.format('Failed to load exercise: {error}', {'error': error}),
+          ),
+        ),
       ),
     );
   }
@@ -158,16 +170,28 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved quick workout for $exerciseName.')),
+        SnackBar(
+          content: Text(
+            context.l10n.format('Saved quick workout for {name}.', {
+              'name': context.l10n.localizeExerciseName(exerciseName),
+            }),
+          ),
+        ),
       );
       Navigator.of(context).pop();
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not save workout: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.l10n.format('Could not save workout: {error}', {
+              'error': error,
+            }),
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -192,24 +216,36 @@ class _QuickWorkoutScreenState extends ConsumerState<QuickWorkoutScreen> {
 
       if (reps == null || reps <= 0) {
         _showValidationError(
-          'Set ${index + 1}: reps must be a positive integer.',
+          context.l10n.format('Set {index}: reps must be a positive integer.', {
+            'index': index + 1,
+          }),
         );
         return null;
       }
       if (weight == null || weight <= 0) {
         _showValidationError(
-          'Set ${index + 1}: weight must be a positive number.',
+          context.l10n.format(
+            'Set {index}: weight must be a positive number.',
+            {'index': index + 1},
+          ),
         );
         return null;
       }
       if (restText.isNotEmpty && (rest == null || rest < 0)) {
         _showValidationError(
-          'Set ${index + 1}: rest must be a non-negative integer.',
+          context.l10n.format(
+            'Set {index}: rest must be a non-negative integer.',
+            {'index': index + 1},
+          ),
         );
         return null;
       }
       if (rpeText.isNotEmpty && (rpe == null || rpe < 0 || rpe > 10)) {
-        _showValidationError('Set ${index + 1}: RPE must be between 0 and 10.');
+        _showValidationError(
+          context.l10n.format('Set {index}: RPE must be between 0 and 10.', {
+            'index': index + 1,
+          }),
+        );
         return null;
       }
 
@@ -256,6 +292,7 @@ class _SetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -265,14 +302,14 @@ class _SetCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'Set $index',
+                  l10n.format('Set {index}', {'index': index}),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const Spacer(),
                 if (onRemove != null)
                   IconButton(
                     onPressed: onRemove,
-                    tooltip: 'Remove set',
+                    tooltip: l10n.tr('Remove set'),
                     icon: const Icon(Icons.delete_outline),
                   ),
               ],
@@ -284,7 +321,7 @@ class _SetCard extends StatelessWidget {
                   child: _NumberField(
                     controller: controllers.repsController,
                     fieldKey: Key('set_${index}_reps'),
-                    label: 'Reps *',
+                    label: l10n.tr('Reps *'),
                     decimal: false,
                     onChanged: (_) => onChanged(),
                   ),
@@ -294,7 +331,7 @@ class _SetCard extends StatelessWidget {
                   child: _NumberField(
                     controller: controllers.weightController,
                     fieldKey: Key('set_${index}_weight'),
-                    label: 'Weight kg *',
+                    label: l10n.tr('Weight kg *'),
                     decimal: true,
                     onChanged: (_) => onChanged(),
                   ),
@@ -308,7 +345,7 @@ class _SetCard extends StatelessWidget {
                   child: _NumberField(
                     controller: controllers.restController,
                     fieldKey: Key('set_${index}_rest'),
-                    label: 'Rest sec',
+                    label: l10n.tr('Rest sec'),
                     decimal: false,
                     onChanged: (_) => onChanged(),
                   ),
@@ -318,7 +355,7 @@ class _SetCard extends StatelessWidget {
                   child: _NumberField(
                     controller: controllers.rpeController,
                     fieldKey: Key('set_${index}_rpe'),
-                    label: 'RPE',
+                    label: l10n.tr('RPE'),
                     decimal: true,
                     onChanged: (_) => onChanged(),
                   ),

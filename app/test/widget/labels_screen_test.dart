@@ -7,6 +7,8 @@ import 'package:training_log_app/core/state/providers.dart';
 import 'package:training_log_app/features/exercises/exercise_repository.dart';
 import 'package:training_log_app/features/exercises/labels_screen.dart';
 
+import '../test_helpers/localized_test_app.dart';
+
 void main() {
   testWidgets('labels description includes delete rule for added labels', (
     tester,
@@ -120,7 +122,7 @@ Future<void> _pumpLabelsScreen(
           (ref) => Stream.value(const <ExerciseWithLabels>[]),
         ),
       ],
-      child: const MaterialApp(home: LabelsScreen()),
+      child: localizedTestApp(home: const LabelsScreen()),
     ),
   );
   await tester.pumpAndSettle();
@@ -145,7 +147,10 @@ class _FakeExerciseRepository implements ExerciseRepository {
   @override
   Future<DeletedCustomLabelSnapshot?> deleteCustomLabel(String label) async {
     deletedLabels.add(label);
-    return DeletedCustomLabelSnapshot(labelName: label, linkedExerciseIds: const []);
+    return DeletedCustomLabelSnapshot(
+      labelName: label,
+      linkedExerciseIds: const [],
+    );
   }
 
   @override

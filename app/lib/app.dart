@@ -1,12 +1,18 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/state/providers.dart';
+import 'l10n/app_localizations.dart';
 import 'ui/app_router.dart';
 
-class TrainingLogApp extends StatelessWidget {
+class TrainingLogApp extends ConsumerWidget {
   const TrainingLogApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedLocale = ref
+        .watch(appLocaleProvider)
+        .maybeWhen(data: (value) => value, orElse: () => null);
     final colorScheme = ColorScheme.fromSeed(seedColor: Colors.teal);
     final outlinedActionStyle = OutlinedButton.styleFrom(
       foregroundColor: colorScheme.primary,
@@ -15,8 +21,11 @@ class TrainingLogApp extends StatelessWidget {
     );
 
     return MaterialApp.router(
-      title: 'Training Log',
+      onGenerateTitle: (context) => context.l10n.tr('Training Log'),
       debugShowCheckedModeBanner: false,
+      locale: selectedLocale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,

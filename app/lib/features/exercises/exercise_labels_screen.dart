@@ -4,17 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/state/providers.dart';
 import '../../core/widgets/label_pill_selector.dart';
+import '../../l10n/app_localizations.dart';
 
 class ExerciseLabelsScreen extends ConsumerStatefulWidget {
-  const ExerciseLabelsScreen({
-    required this.exerciseId,
-    super.key,
-  });
+  const ExerciseLabelsScreen({required this.exerciseId, super.key});
 
   final String exerciseId;
 
   @override
-  ConsumerState<ExerciseLabelsScreen> createState() => _ExerciseLabelsScreenState();
+  ConsumerState<ExerciseLabelsScreen> createState() =>
+      _ExerciseLabelsScreenState();
 }
 
 class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
@@ -25,14 +24,15 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final exerciseState = ref.watch(exerciseByIdProvider(widget.exerciseId));
     final labelsState = ref.watch(allLabelsProvider);
     return exerciseState.when(
       data: (exercise) {
         if (exercise == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Edit Labels')),
-            body: const Center(child: Text('Exercise not found.')),
+            appBar: AppBar(title: Text(l10n.tr('Edit Labels'))),
+            body: Center(child: Text(l10n.tr('Exercise not found.'))),
           );
         }
 
@@ -46,12 +46,15 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
 
         return _buildScaffold(context, exercise, labelsState);
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
-        appBar: AppBar(title: const Text('Edit Labels')),
-        body: Center(child: Text('Failed to load exercise: $error')),
+        appBar: AppBar(title: Text(l10n.tr('Edit Labels'))),
+        body: Center(
+          child: Text(
+            l10n.format('Failed to load exercise: {error}', {'error': error}),
+          ),
+        ),
       ),
     );
   }
@@ -61,9 +64,14 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
     ExerciseWithLabels exercise,
     AsyncValue<List<String>> labelsState,
   ) {
+    final l10n = context.l10n;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Labels: ${exercise.name}'),
+        title: Text(
+          l10n.format('Labels: {name}', {
+            'name': l10n.localizeExerciseName(exercise.name),
+          }),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -76,7 +84,7 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Save'),
+                  : Text(l10n.tr('Save')),
             ),
           ),
         ],
@@ -91,8 +99,12 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
                 padding: const EdgeInsets.all(12),
                 child: Text(
                   exercise.canRestoreStandardLabels
-                      ? 'This is a standard app exercise with custom labels applied.'
-                      : 'This is one of the standard app exercises. Saving creates a temporary custom label override.',
+                      ? l10n.tr(
+                          'This is a standard app exercise with custom labels applied.',
+                        )
+                      : l10n.tr(
+                          'This is one of the standard app exercises. Saving creates a temporary custom label override.',
+                        ),
                 ),
               ),
             ),
@@ -103,7 +115,7 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
               child: OutlinedButton(
                 key: const Key('exercise_labels_restore_standard'),
                 onPressed: _isSaving ? null : () => _restoreStandard(exercise),
-                child: const Text('Back to standard labels'),
+                child: Text(l10n.tr('Back to standard labels')),
               ),
             ),
           ],
@@ -125,11 +137,13 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
               },
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Text('Failed to load labels: $error'),
+            error: (error, _) => Text(
+              l10n.format('Failed to load labels: {error}', {'error': error}),
+            ),
           ),
           const SizedBox(height: 12),
           if (_labels.isEmpty)
-            const Text('No labels selected. Add at least one label.'),
+            Text(l10n.tr('No labels selected. Add at least one label.')),
           if (_validationMessage != null) ...[
             const SizedBox(height: 12),
             Card(
@@ -152,30 +166,36 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
 
   Future<void> _save(ExerciseWithLabels exercise) async {
     if (_labels.isEmpty) {
-      setState(() => _validationMessage = 'Add at least one label.');
+      setState(
+        () => _validationMessage = context.l10n.tr('Add at least one label.'),
+      );
       return;
     }
 
     setState(() => _isSaving = true);
     try {
-      await ref.read(exerciseRepositoryProvider).saveLabels(
-        exerciseId: exercise.id,
-        labels: _labels,
-      );
+      await ref
+          .read(exerciseRepositoryProvider)
+          .saveLabels(exerciseId: exercise.id, labels: _labels);
       ref.invalidate(exercisesProvider);
       ref.invalidate(exerciseByIdProvider(exercise.id));
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Labels updated.')),
+        SnackBar(content: Text(context.l10n.tr('Labels updated.'))),
       );
       Navigator.of(context).pop();
     } catch (error) {
       if (!mounted) {
         return;
       }
-      setState(() => _validationMessage = 'Could not save labels: $error');
+      setState(
+        () => _validationMessage = context.l10n.format(
+          'Could not save labels: {error}',
+          {'error': error},
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -195,14 +215,19 @@ class _ExerciseLabelsScreenState extends ConsumerState<ExerciseLabelsScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Restored standard labels.')),
+        SnackBar(content: Text(context.l10n.tr('Restored standard labels.'))),
       );
       Navigator.of(context).pop();
     } catch (error) {
       if (!mounted) {
         return;
       }
-      setState(() => _validationMessage = 'Could not restore labels: $error');
+      setState(
+        () => _validationMessage = context.l10n.format(
+          'Could not restore labels: {error}',
+          {'error': error},
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);

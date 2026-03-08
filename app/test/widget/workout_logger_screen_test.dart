@@ -13,6 +13,8 @@ import 'package:training_log_app/features/splits/split_repository.dart';
 import 'package:training_log_app/features/workouts/quick_workout_repository.dart';
 import 'package:training_log_app/features/workouts/workout_logger_screen.dart';
 
+import '../test_helpers/localized_test_app.dart';
+
 void main() {
   testWidgets('free workout shows delete current log action', (tester) async {
     final database = AppDatabase(NativeDatabase.memory());
@@ -21,12 +23,12 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [appDatabaseProvider.overrideWithValue(database)],
-        child: const MaterialApp(
-          home: WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
+        child: localizedTestApp(
+          home: const WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpLoggerFrames(tester);
 
     expect(find.byKey(const Key('workout_logger_delete_log')), findsOneWidget);
   });
@@ -51,15 +53,15 @@ void main() {
               ]),
             ),
           ],
-          child: const MaterialApp(
-            home: WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
+          child: localizedTestApp(
+            home: const WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpLoggerFrames(tester);
 
       await tester.tap(find.byKey(const Key('workout_logger_add_exercise')));
-      await tester.pumpAndSettle();
+      await _pumpLoggerFrames(tester);
 
       expect(
         find.byKey(const Key('split_builder_exercise_picker_search_field')),
@@ -102,15 +104,15 @@ void main() {
             ]),
           ),
         ],
-        child: const MaterialApp(
-          home: WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
+        child: localizedTestApp(
+          home: const WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpLoggerFrames(tester);
 
     await tester.tap(find.byKey(const Key('workout_logger_add_exercise')));
-    await tester.pumpAndSettle();
+    await _pumpLoggerFrames(tester);
 
     expect(find.text('Barbell Bench Press'), findsWidgets);
     expect(find.text('Pull-Up'), findsNothing);
@@ -177,7 +179,7 @@ void main() {
             appDatabaseProvider.overrideWithValue(database),
             userExerciseDatabaseProvider.overrideWithValue(userDatabase),
           ],
-          child: MaterialApp(
+          child: localizedTestApp(
             home: WorkoutLoggerScreen(
               mode: WorkoutSessionMode.splitDay,
               splitId: splitId,
@@ -186,7 +188,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpLoggerFrames(tester);
 
       expect(find.textContaining('Suggested load:'), findsNothing);
       expect(find.textContaining('Best (all-time):'), findsNothing);
@@ -255,21 +257,27 @@ void main() {
               ]),
             ),
           ],
-          child: const MaterialApp(
-            home: WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
+          child: localizedTestApp(
+            home: const WorkoutLoggerScreen(mode: WorkoutSessionMode.free),
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpLoggerFrames(tester);
 
       await tester.tap(find.byKey(const Key('workout_logger_add_exercise')));
-      await tester.pumpAndSettle();
+      await _pumpLoggerFrames(tester);
       await tester.tap(find.text(exercise.name).first);
-      await tester.pumpAndSettle();
+      await _pumpLoggerFrames(tester);
 
       expect(find.textContaining('Last: 70.0 x 8'), findsOneWidget);
       expect(find.textContaining('Suggested load:'), findsNothing);
       expect(find.textContaining('Best (all-time):'), findsNothing);
     },
   );
+}
+
+Future<void> _pumpLoggerFrames(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump(const Duration(milliseconds: 200));
 }

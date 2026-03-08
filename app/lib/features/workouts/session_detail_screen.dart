@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/db/app_database.dart';
 import '../../core/models/logged_set_input.dart';
 import '../../core/state/providers.dart';
+import '../../l10n/app_localizations.dart';
 import 'quick_workout_repository.dart';
 
 class SessionDetailScreen extends ConsumerStatefulWidget {
@@ -38,19 +38,20 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final detailsState = ref.watch(sessionDetailsProvider(widget.sessionId));
     return detailsState.when(
       data: (details) {
         if (details == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Session')),
-            body: const Center(child: Text('Session not found.')),
+            appBar: AppBar(title: Text(l10n.tr('Session'))),
+            body: Center(child: Text(l10n.tr('Session not found.'))),
           );
         }
         _hydrateIfNeeded(details);
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Session Overview'),
+            title: Text(l10n.tr('Session Overview')),
             actions: _buildAppBarActions(details),
           ),
           body: ListView(
@@ -65,9 +66,9 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
                 key: const Key('session_detail_name'),
                 controller: _sessionNameController,
                 readOnly: !_isEditing,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Session name',
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: l10n.tr('Session name'),
                 ),
               ),
               const SizedBox(height: 12),
@@ -90,24 +91,29 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
-        appBar: AppBar(title: const Text('Session')),
-        body: Center(child: Text('Failed to load session: $error')),
+        appBar: AppBar(title: Text(l10n.tr('Session'))),
+        body: Center(
+          child: Text(
+            l10n.format('Failed to load session: {error}', {'error': error}),
+          ),
+        ),
       ),
     );
   }
 
   List<Widget> _buildAppBarActions(WorkoutSessionDetails details) {
+    final l10n = context.l10n;
     if (_isEditing) {
       return [
         IconButton(
           key: const Key('session_detail_discard'),
-          tooltip: 'Discard edits',
+          tooltip: l10n.tr('Discard edits'),
           onPressed: _isSaving ? null : () => _discardChanges(details),
           icon: const Icon(Icons.close),
         ),
         IconButton(
           key: const Key('session_detail_save'),
-          tooltip: 'Save',
+          tooltip: l10n.tr('Save'),
           onPressed: _isSaving ? null : _saveChanges,
           icon: _isSaving
               ? const SizedBox(
@@ -123,7 +129,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
     return [
       IconButton(
         key: const Key('session_detail_edit'),
-        tooltip: 'Edit session',
+        tooltip: l10n.tr('Edit session'),
         onPressed: _isSaving || _isDeleting
             ? null
             : () => setState(() => _isEditing = true),
@@ -131,7 +137,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       ),
       IconButton(
         key: const Key('session_detail_delete'),
-        tooltip: 'Delete session',
+        tooltip: l10n.tr('Delete session'),
         onPressed: _isSaving || _isDeleting ? null : _deleteSession,
         icon: _isDeleting
             ? const SizedBox(
@@ -213,21 +219,25 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       return;
     }
 
+    final l10n = context.l10n;
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete set?'),
+        title: Text(l10n.tr('Delete set?')),
         content: Text(
-          'Remove set ${exercise.rows.length} from ${exercise.exerciseName}?',
+          l10n.format('Remove set {index} from {name}?', {
+            'index': exercise.rows.length,
+            'name': l10n.localizeExerciseName(exercise.exerciseName),
+          }),
         ),
         actions: [
           IconButton(
-            tooltip: 'Cancel',
+            tooltip: l10n.tr('Cancel'),
             onPressed: () => Navigator.of(context).pop(false),
             icon: const Icon(Icons.close),
           ),
           IconButton(
-            tooltip: 'Confirm',
+            tooltip: l10n.tr('Confirm'),
             onPressed: () => Navigator.of(context).pop(true),
             icon: const Icon(Icons.check),
           ),
@@ -251,6 +261,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
   }
 
   Future<void> _saveChanges() async {
+    final l10n = context.l10n;
     final exercises = <WorkoutExerciseLogInput>[];
     for (final exercise in _exerciseStates) {
       final sets = <LoggedSetInput>[];
@@ -268,19 +279,28 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
 
         if (reps == null || reps <= 0 || weight == null || weight <= 0) {
           _showMessage(
-            '${exercise.exerciseName} set ${index + 1}: reps and weight must be valid.',
+            l10n.format('{name} set {index}: reps and weight must be valid.', {
+              'name': l10n.localizeExerciseName(exercise.exerciseName),
+              'index': index + 1,
+            }),
           );
           return;
         }
         if (restText.isNotEmpty && (rest == null || rest < 0)) {
           _showMessage(
-            '${exercise.exerciseName} set ${index + 1}: rest must be non-negative.',
+            l10n.format('{name} set {index}: rest must be non-negative.', {
+              'name': l10n.localizeExerciseName(exercise.exerciseName),
+              'index': index + 1,
+            }),
           );
           return;
         }
         if (rpeText.isNotEmpty && (rpe == null || rpe < 0 || rpe > 10)) {
           _showMessage(
-            '${exercise.exerciseName} set ${index + 1}: RPE must be 0-10.',
+            l10n.format('{name} set {index}: RPE must be 0-10.', {
+              'name': l10n.localizeExerciseName(exercise.exerciseName),
+              'index': index + 1,
+            }),
           );
           return;
         }
@@ -302,7 +322,7 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
     }
 
     if (exercises.isEmpty) {
-      _showMessage('At least one set is required.');
+      _showMessage(l10n.tr('At least one set is required.'));
       return;
     }
 
@@ -331,12 +351,14 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Session updated.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.tr('Session updated.'))));
     } catch (error) {
       if (!mounted) {
         return;
       }
-      _showMessage('Could not update session: $error');
+      _showMessage(
+        l10n.format('Could not update session: {error}', {'error': error}),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -345,19 +367,22 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
   }
 
   Future<void> _deleteSession() async {
+    final l10n = context.l10n;
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete session?'),
-        content: const Text('This will permanently delete the workout record.'),
+        title: Text(l10n.tr('Delete session?')),
+        content: Text(
+          l10n.tr('This will permanently delete the workout record.'),
+        ),
         actions: [
           IconButton(
-            tooltip: 'Cancel',
+            tooltip: l10n.tr('Cancel'),
             onPressed: () => Navigator.of(context).pop(false),
             icon: const Icon(Icons.close),
           ),
           IconButton(
-            tooltip: 'Delete',
+            tooltip: l10n.tr('Delete'),
             onPressed: () => Navigator.of(context).pop(true),
             icon: const Icon(Icons.delete_outline),
           ),
@@ -384,13 +409,15 @@ class _SessionDetailScreenState extends ConsumerState<SessionDetailScreen> {
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Session deleted.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.tr('Session deleted.'))));
       context.pop();
     } catch (error) {
       if (!mounted) {
         return;
       }
-      _showMessage('Could not delete session: $error');
+      _showMessage(
+        l10n.format('Could not delete session: {error}', {'error': error}),
+      );
     } finally {
       if (mounted) {
         setState(() => _isDeleting = false);
@@ -421,20 +448,29 @@ class _SessionSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final started = DateTime.fromMillisecondsSinceEpoch(session.startedAt);
     final ended = DateTime.fromMillisecondsSinceEpoch(session.endedAt);
     final duration = ended.difference(started).inMinutes;
+    final sessionType = l10n.tr(
+      session.sessionType,
+      fallback: session.sessionType,
+    );
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(DateFormat('MMM d, yyyy HH:mm').format(started)),
+            Text(l10n.formatDateTimeLong(started)),
             const SizedBox(height: 4),
-            Text('Type: ${session.sessionType}'),
-            Text('Duration: ${duration < 0 ? 0 : duration} min'),
-            Text('Total sets: $totalSets'),
+            Text(l10n.format('Type: {type}', {'type': sessionType})),
+            Text(
+              l10n.format('Duration: {minutes} min', {
+                'minutes': duration < 0 ? 0 : duration,
+              }),
+            ),
+            Text(l10n.format('Total sets: {count}', {'count': totalSets})),
           ],
         ),
       ),
@@ -457,6 +493,7 @@ class _SessionExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -464,7 +501,7 @@ class _SessionExerciseCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              exercise.exerciseName,
+              l10n.localizeExerciseName(exercise.exerciseName),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -485,7 +522,7 @@ class _SessionExerciseCard extends StatelessWidget {
                 children: [
                   IconButton(
                     key: Key('session_detail_add_set_${exercise.exerciseId}'),
-                    tooltip: 'Add set',
+                    tooltip: l10n.tr('Add set'),
                     onPressed: onAddSet,
                     icon: const Icon(Icons.add),
                   ),
@@ -493,7 +530,7 @@ class _SessionExerciseCard extends StatelessWidget {
                     key: Key(
                       'session_detail_delete_set_${exercise.exerciseId}',
                     ),
-                    tooltip: 'Delete last set',
+                    tooltip: l10n.tr('Delete set'),
                     onPressed: onDeleteLastSet,
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -519,13 +556,14 @@ class _SessionSetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Row(
       children: [
         SizedBox(width: 30, child: Text('$setNumber')),
         Expanded(
           child: _SessionNumberField(
             controller: row.weightController,
-            label: 'Weight',
+            label: l10n.tr('Weight'),
             decimal: true,
             enabled: enabled,
           ),
@@ -534,7 +572,7 @@ class _SessionSetRow extends StatelessWidget {
         Expanded(
           child: _SessionNumberField(
             controller: row.repsController,
-            label: 'Reps',
+            label: l10n.tr('Reps'),
             decimal: false,
             enabled: enabled,
           ),
@@ -543,7 +581,7 @@ class _SessionSetRow extends StatelessWidget {
         Expanded(
           child: _SessionNumberField(
             controller: row.restController,
-            label: 'Rest',
+            label: l10n.tr('Rest'),
             decimal: false,
             enabled: enabled,
           ),

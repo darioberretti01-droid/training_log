@@ -220,6 +220,12 @@ class AppDatabase extends _$AppDatabase {
         'updated_at INTEGER NOT NULL'
         ')',
       );
+      await customStatement(
+        'CREATE TABLE IF NOT EXISTS app_settings ('
+        'key TEXT PRIMARY KEY, '
+        'value TEXT'
+        ')',
+      );
     },
   );
 }

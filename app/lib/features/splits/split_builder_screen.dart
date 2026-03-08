@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/state/providers.dart';
 import '../../core/time/app_clock.dart';
+import '../../l10n/app_localizations.dart';
 import '../exercises/exercise_list_screen.dart';
 import 'split_builder_draft.dart';
 import 'split_builder_draft_storage.dart';
@@ -82,6 +83,7 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final isEditing = widget.editingSplitId != null;
     final splitDetailsState = isEditing
         ? ref.watch(splitDetailsProvider(widget.editingSplitId!))
@@ -96,7 +98,9 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(isEditing ? 'Edit Split' : 'Split Builder'),
+          title: Text(
+            isEditing ? l10n.tr('Edit Split') : l10n.tr('Split Builder'),
+          ),
           actions: [
             if (!isEditing)
               Padding(
@@ -104,7 +108,7 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
                 child: IconButton(
                   key: const Key('split_builder_erase_draft'),
                   onPressed: _isSaving ? null : _confirmEraseDraft,
-                  tooltip: 'Erase draft',
+                  tooltip: l10n.tr('Erase draft'),
                   icon: const Icon(Icons.delete_outline),
                 ),
               ),
@@ -119,7 +123,7 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Save'),
+                    : Text(l10n.tr('Save')),
               ),
             ),
           ],
@@ -134,7 +138,7 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
                     if (isEditing) {
                       if (details == null) {
                         return _BuilderErrorState(
-                          message: 'Split not found.',
+                          message: l10n.tr('Split not found.'),
                           onRetry: () {
                             ref.invalidate(
                               splitDetailsProvider(widget.editingSplitId!),
@@ -159,7 +163,10 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
                   error: (error, _) => _BuilderErrorState(
-                    message: 'Failed to load split details: $error',
+                    message: l10n.format(
+                      'Failed to load split details: {error}',
+                      {'error': error},
+                    ),
                     onRetry: () {
                       if (widget.editingSplitId != null) {
                         ref.invalidate(
@@ -186,14 +193,19 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => _BuilderErrorState(
-            message: 'Failed to load exercises: $error',
+            message: context.l10n.format('Failed to load exercises: {error}', {
+              'error': error,
+            }),
             onRetry: () => ref.invalidate(exercisesProvider),
           ),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => _BuilderErrorState(
-        message: 'Failed to initialize exercise data: $error',
+        message: context.l10n.format(
+          'Failed to initialize exercise data: {error}',
+          {'error': error},
+        ),
         onRetry: () => ref.invalidate(seedDataProvider),
       ),
     );
@@ -326,21 +338,24 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
   }
 
   Widget _buildBody(BuildContext context, List<ExerciseWithLabels> exercises) {
+    final l10n = context.l10n;
     final volumeSummary = _buildMuscleVolumeSummary(exercises);
     final availableControlLabels = _buildAvailableControlLabels(exercises);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          'Build a split with ordered training days and planned exercises.',
+          l10n.tr(
+            'Build a split with ordered training days and planned exercises.',
+          ),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
         TextField(
           key: const Key('split_name_field'),
           controller: _splitNameController,
-          decoration: const InputDecoration(
-            labelText: 'Split name *',
+          decoration: InputDecoration(
+            labelText: l10n.tr('Split name *'),
             border: OutlineInputBorder(),
           ),
           onChanged: (_) => _clearValidation(),
@@ -349,7 +364,7 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
         SwitchListTile(
           key: const Key('split_set_active_switch'),
           contentPadding: EdgeInsets.zero,
-          title: const Text('Set as active split'),
+          title: Text(l10n.tr('Set as active split')),
           value: _setAsActive,
           onChanged: (value) {
             setState(() => _setAsActive = value);
@@ -419,13 +434,15 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
           key: const Key('split_add_day'),
           onPressed: _addDay,
           icon: const Icon(Icons.add),
-          label: const Text('Add Day'),
+          label: Text(l10n.tr('Add Day')),
         ),
         if (exercises.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
             child: Text(
-              'No exercises available. Seed exercises before creating a split.',
+              l10n.tr(
+                'No exercises available. Seed exercises before creating a split.',
+              ),
             ),
           ),
       ],
@@ -653,21 +670,24 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
   }
 
   Future<void> _confirmEraseDraft() async {
+    final l10n = context.l10n;
     final shouldErase = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Erase split draft?'),
-        content: const Text(
-          'You are erasing the current split draft. Do you want to continue?',
+        title: Text(l10n.tr('Erase split draft?')),
+        content: Text(
+          l10n.tr(
+            'You are erasing the current split draft. Do you want to continue?',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Erase'),
+            child: Text(l10n.tr('Erase')),
           ),
         ],
       ),
@@ -702,9 +722,9 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Split draft erased.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.l10n.tr('Split draft erased.'))),
+    );
   }
 
   Future<void> _save() async {
@@ -738,16 +758,17 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
       if (!mounted) {
         return;
       }
+      final l10n = context.l10n;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             _setAsActive
                 ? (isEditing
-                      ? 'Saved split changes and set it active.'
-                      : 'Saved split and set it active.')
+                      ? l10n.tr('Saved split changes and set it active.')
+                      : l10n.tr('Saved split and set it active.'))
                 : (isEditing
-                      ? 'Saved split changes.'
-                      : 'Saved split successfully.'),
+                      ? l10n.tr('Saved split changes.')
+                      : l10n.tr('Saved split successfully.')),
           ),
         ),
       );
@@ -756,9 +777,15 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not save split: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.l10n.format('Could not save split: {error}', {
+              'error': error,
+            }),
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -767,13 +794,14 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
   }
 
   SplitDraftInput? _parseInput() {
+    final l10n = context.l10n;
     final splitName = _splitNameController.text.trim();
     if (splitName.isEmpty) {
-      _showValidation('Split name is required.');
+      _showValidation(l10n.tr('Split name is required.'));
       return null;
     }
     if (_days.isEmpty) {
-      _showValidation('At least one day is required.');
+      _showValidation(l10n.tr('At least one day is required.'));
       return null;
     }
 
@@ -784,11 +812,17 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
       final dayNumber = dayIndex + 1;
       final dayTitle = day.titleController.text.trim();
       if (dayTitle.isEmpty) {
-        _showValidation('Day $dayNumber title is required.');
+        _showValidation(
+          l10n.format('Day {day} title is required.', {'day': dayNumber}),
+        );
         return null;
       }
       if (day.plannedExercises.isEmpty) {
-        _showValidation('Day $dayNumber must include at least one exercise.');
+        _showValidation(
+          l10n.format('Day {day} must include at least one exercise.', {
+            'day': dayNumber,
+          }),
+        );
         return null;
       }
 
@@ -803,7 +837,10 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
         final exerciseId = exerciseDraft.selectedExerciseId;
         if (exerciseId == null || exerciseId.isEmpty) {
           _showValidation(
-            'Day $dayNumber, exercise $exerciseNumber: choose an exercise.',
+            l10n.format('Day {day}, exercise {exercise}: choose an exercise.', {
+              'day': dayNumber,
+              'exercise': exerciseNumber,
+            }),
           );
           return null;
         }
@@ -813,7 +850,10 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
         );
         if (sets == null || sets <= 0) {
           _showValidation(
-            'Day $dayNumber, exercise $exerciseNumber: sets must be a positive integer.',
+            l10n.format(
+              'Day {day}, exercise {exercise}: sets must be a positive integer.',
+              {'day': dayNumber, 'exercise': exerciseNumber},
+            ),
           );
           return null;
         }
@@ -822,13 +862,19 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
         final repMax = int.tryParse(exerciseDraft.repMaxController.text.trim());
         if (repMin == null || repMin <= 0) {
           _showValidation(
-            'Day $dayNumber, exercise $exerciseNumber: minimum reps must be positive.',
+            l10n.format(
+              'Day {day}, exercise {exercise}: minimum reps must be positive.',
+              {'day': dayNumber, 'exercise': exerciseNumber},
+            ),
           );
           return null;
         }
         if (repMax == null || repMax < repMin) {
           _showValidation(
-            'Day $dayNumber, exercise $exerciseNumber: maximum reps must be >= minimum reps.',
+            l10n.format(
+              'Day {day}, exercise {exercise}: maximum reps must be >= minimum reps.',
+              {'day': dayNumber, 'exercise': exerciseNumber},
+            ),
           );
           return null;
         }
@@ -837,7 +883,10 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
         final restSeconds = restText.isEmpty ? null : int.tryParse(restText);
         if (restText.isNotEmpty && (restSeconds == null || restSeconds < 0)) {
           _showValidation(
-            'Day $dayNumber, exercise $exerciseNumber: rest must be a non-negative integer.',
+            l10n.format(
+              'Day {day}, exercise {exercise}: rest must be a non-negative integer.',
+              {'day': dayNumber, 'exercise': exerciseNumber},
+            ),
           );
           return null;
         }
@@ -847,7 +896,10 @@ class _SplitBuilderScreenState extends ConsumerState<SplitBuilderScreen>
         if (rpeText.isNotEmpty &&
             (targetRpe == null || targetRpe < 0 || targetRpe > 10)) {
           _showValidation(
-            'Day $dayNumber, exercise $exerciseNumber: target RPE must be between 0 and 10.',
+            l10n.format(
+              'Day {day}, exercise {exercise}: target RPE must be between 0 and 10.',
+              {'day': dayNumber, 'exercise': exerciseNumber},
+            ),
           );
           return null;
         }
@@ -922,6 +974,7 @@ class _DayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -931,14 +984,14 @@ class _DayCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'Day $dayNumber',
+                  l10n.format('Day {day}', {'day': dayNumber}),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const Spacer(),
                 if (onRemoveDay != null)
                   IconButton(
                     onPressed: onRemoveDay,
-                    tooltip: 'Remove day',
+                    tooltip: l10n.tr('Remove day'),
                     icon: const Icon(Icons.delete_outline),
                   ),
               ],
@@ -947,8 +1000,8 @@ class _DayCard extends StatelessWidget {
             TextField(
               key: Key('day_${dayNumber}_title'),
               controller: dayDraft.titleController,
-              decoration: const InputDecoration(
-                labelText: 'Day title *',
+              decoration: InputDecoration(
+                labelText: l10n.tr('Day title *'),
                 border: OutlineInputBorder(),
               ),
               onChanged: (_) => onChanged(),
@@ -974,7 +1027,7 @@ class _DayCard extends StatelessWidget {
               key: Key('day_${dayNumber}_add_exercise'),
               onPressed: onAddExercise,
               icon: const Icon(Icons.add),
-              label: const Text('Add Exercise'),
+              label: Text(l10n.tr('Add Exercise')),
             ),
           ],
         ),
@@ -1005,6 +1058,7 @@ class _PlannedExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     ExerciseWithLabels? selectedExercise;
     final selectedId = draft.selectedExerciseId;
     if (selectedId != null && selectedId.isNotEmpty) {
@@ -1015,12 +1069,14 @@ class _PlannedExerciseCard extends StatelessWidget {
         }
       }
     }
-    final selectedName = selectedExercise?.name;
+    final selectedName = selectedExercise == null
+        ? null
+        : l10n.localizeExerciseName(selectedExercise.name);
     final selectedLabels = selectedExercise?.labels ?? const <String>[];
     final canSelectExercise = exercises.isNotEmpty;
     final pickerPlaceholder = canSelectExercise
-        ? 'Choose exercise'
-        : 'No exercises available';
+        ? l10n.tr('Choose exercise')
+        : l10n.tr('No exercises available');
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1035,14 +1091,14 @@ class _PlannedExerciseCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'Exercise $exerciseNumber',
+                  l10n.format('Exercise {number}', {'number': exerciseNumber}),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const Spacer(),
                 if (onRemove != null)
                   IconButton(
                     onPressed: onRemove,
-                    tooltip: 'Remove exercise',
+                    tooltip: l10n.tr('Remove exercise'),
                     icon: const Icon(Icons.delete_outline),
                   ),
               ],
@@ -1066,8 +1122,8 @@ class _PlannedExerciseCard extends StatelessWidget {
                     },
               borderRadius: BorderRadius.circular(6),
               child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Exercise *',
+                decoration: InputDecoration(
+                  labelText: l10n.tr('Exercise *'),
                   border: OutlineInputBorder(),
                   floatingLabelBehavior: FloatingLabelBehavior.always,
                 ),
@@ -1102,15 +1158,18 @@ class _PlannedExerciseCard extends StatelessWidget {
               const SizedBox(height: 2),
               Row(
                 children: [
-                  Text('Labels', style: Theme.of(context).textTheme.labelSmall),
+                  Text(
+                    l10n.tr('Labels'),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
                   const Spacer(),
                   IconButton(
                     key: Key(
                       'day_${dayNumber}_exercise_${exerciseNumber}_labels_toggle',
                     ),
                     tooltip: draft.areLabelsExpanded
-                        ? 'Hide labels'
-                        : 'Show labels',
+                        ? l10n.tr('Hide labels')
+                        : l10n.tr('Show labels'),
                     onPressed: () {
                       draft.areLabelsExpanded = !draft.areLabelsExpanded;
                       onChanged();
@@ -1139,7 +1198,11 @@ class _PlannedExerciseCard extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: selectedLabels
-                      .map((label) => _ExerciseLabelTag(label: label))
+                      .map(
+                        (label) => _ExerciseLabelTag(
+                          label: l10n.localizeLabelName(label),
+                        ),
+                      )
                       .toList(growable: false),
                 ),
                 const SizedBox(height: 12),
@@ -1157,7 +1220,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                       'day_${dayNumber}_exercise_${exerciseNumber}_sets',
                     ),
                     controller: draft.targetSetsController,
-                    label: 'Sets *',
+                    label: l10n.tr('Sets *'),
                     allowDecimal: false,
                     onChanged: onChanged,
                   ),
@@ -1169,7 +1232,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                       'day_${dayNumber}_exercise_${exerciseNumber}_rep_min',
                     ),
                     controller: draft.repMinController,
-                    label: 'Rep min *',
+                    label: l10n.tr('Rep min *'),
                     allowDecimal: false,
                     onChanged: onChanged,
                   ),
@@ -1181,7 +1244,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                       'day_${dayNumber}_exercise_${exerciseNumber}_rep_max',
                     ),
                     controller: draft.repMaxController,
-                    label: 'Rep max *',
+                    label: l10n.tr('Rep max *'),
                     allowDecimal: false,
                     onChanged: onChanged,
                   ),
@@ -1197,7 +1260,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                       'day_${dayNumber}_exercise_${exerciseNumber}_rest',
                     ),
                     controller: draft.restSecondsController,
-                    label: 'Rest sec',
+                    label: l10n.tr('Rest sec'),
                     allowDecimal: false,
                     onChanged: onChanged,
                   ),
@@ -1209,7 +1272,7 @@ class _PlannedExerciseCard extends StatelessWidget {
                       'day_${dayNumber}_exercise_${exerciseNumber}_rpe',
                     ),
                     controller: draft.targetRpeController,
-                    label: 'Target RPE',
+                    label: l10n.tr('Target RPE'),
                     allowDecimal: true,
                     onChanged: onChanged,
                   ),
@@ -1296,7 +1359,10 @@ class _BuilderErrorState extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            FilledButton(
+              onPressed: onRetry,
+              child: Text(context.l10n.tr('Retry')),
+            ),
           ],
         ),
       ),

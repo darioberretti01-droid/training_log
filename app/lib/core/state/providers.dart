@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../db/app_database.dart';
 import '../db/user_exercise_database.dart';
 import '../models/exercise_with_labels.dart';
+import '../settings/app_settings_storage.dart';
 import '../time/app_clock.dart';
 import '../../devtools/demo_fixture_service.dart';
 import '../../features/exercises/exercise_repository.dart';
@@ -492,6 +494,10 @@ final splitBuilderDraftStorageProvider = Provider<SplitBuilderDraftStorage>((
   return SplitBuilderDraftStorage(ref.watch(appDatabaseProvider));
 });
 
+final appSettingsStorageProvider = Provider<AppSettingsStorage>((ref) {
+  return AppSettingsStorage(ref.watch(appDatabaseProvider));
+});
+
 final demoFixtureServiceProvider = Provider<DemoFixtureService>((ref) {
   return DemoFixtureService(
     appDb: ref.watch(appDatabaseProvider),
@@ -531,3 +537,41 @@ final todayWorkoutDraftProvider = Provider<WorkoutDraft?>((ref) {
   }
   return draft;
 });
+
+class AppLocaleController extends AsyncNotifier<Locale?> {
+  @override
+  Future<Locale?> build() async {
+    final languageCode = await ref
+        .read(appSettingsStorageProvider)
+        .loadLanguageCode();
+    return _localeFromLanguageCode(languageCode);
+  }
+
+  Future<void> useSystemLocale() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(appSettingsStorageProvider).clearLanguageCode();
+      return null;
+    });
+  }
+
+  Future<void> setLanguageCode(String languageCode) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(appSettingsStorageProvider).saveLanguageCode(languageCode);
+      return _localeFromLanguageCode(languageCode);
+    });
+  }
+
+  Locale? _localeFromLanguageCode(String? languageCode) {
+    final normalized = languageCode?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+    return Locale(normalized);
+  }
+}
+
+final appLocaleProvider = AsyncNotifierProvider<AppLocaleController, Locale?>(
+  AppLocaleController.new,
+);

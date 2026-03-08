@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/state/providers.dart';
 import '../../core/widgets/label_pill_selector.dart';
+import '../../l10n/app_localizations.dart';
 
 class ExerciseCreateScreen extends ConsumerStatefulWidget {
   const ExerciseCreateScreen({super.key});
 
   @override
-  ConsumerState<ExerciseCreateScreen> createState() => _ExerciseCreateScreenState();
+  ConsumerState<ExerciseCreateScreen> createState() =>
+      _ExerciseCreateScreenState();
 }
 
 class _ExerciseCreateScreenState extends ConsumerState<ExerciseCreateScreen> {
@@ -25,11 +27,12 @@ class _ExerciseCreateScreenState extends ConsumerState<ExerciseCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final labelsState = ref.watch(allLabelsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Exercise'),
+        title: Text(l10n.tr('Create Exercise')),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -42,7 +45,7 @@ class _ExerciseCreateScreenState extends ConsumerState<ExerciseCreateScreen> {
                       width: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Save'),
+                  : Text(l10n.tr('Save')),
             ),
           ),
         ],
@@ -53,8 +56,8 @@ class _ExerciseCreateScreenState extends ConsumerState<ExerciseCreateScreen> {
           TextField(
             key: const Key('exercise_create_name'),
             controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Exercise name *',
+            decoration: InputDecoration(
+              labelText: l10n.tr('Exercise name *'),
               border: OutlineInputBorder(),
             ),
             textInputAction: TextInputAction.next,
@@ -78,11 +81,13 @@ class _ExerciseCreateScreenState extends ConsumerState<ExerciseCreateScreen> {
               },
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Text('Failed to load labels: $error'),
+            error: (error, _) => Text(
+              l10n.format('Failed to load labels: {error}', {'error': error}),
+            ),
           ),
           const SizedBox(height: 12),
           if (_labels.isEmpty)
-            const Text('No labels selected yet. Select at least one label.'),
+            Text(l10n.tr('No labels selected yet. Select at least one label.')),
           if (_validationMessage != null) ...[
             const SizedBox(height: 12),
             Card(
@@ -114,26 +119,30 @@ class _ExerciseCreateScreenState extends ConsumerState<ExerciseCreateScreen> {
 
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _validationMessage = 'Exercise name is required.');
+      setState(
+        () =>
+            _validationMessage = context.l10n.tr('Exercise name is required.'),
+      );
       return;
     }
     if (_labels.isEmpty) {
-      setState(() => _validationMessage = 'Add at least one label.');
+      setState(
+        () => _validationMessage = context.l10n.tr('Add at least one label.'),
+      );
       return;
     }
 
     setState(() => _isSaving = true);
     try {
-      await ref.read(exerciseRepositoryProvider).createExercise(
-        name: name,
-        labels: _labels,
-      );
+      await ref
+          .read(exerciseRepositoryProvider)
+          .createExercise(name: name, labels: _labels);
       ref.invalidate(exercisesProvider);
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Exercise created.')),
+        SnackBar(content: Text(context.l10n.tr('Exercise created.'))),
       );
       Navigator.of(context).pop();
     } catch (error) {
@@ -141,7 +150,10 @@ class _ExerciseCreateScreenState extends ConsumerState<ExerciseCreateScreen> {
         return;
       }
       setState(() {
-        _validationMessage = 'Could not create exercise: $error';
+        _validationMessage = context.l10n.format(
+          'Could not create exercise: {error}',
+          {'error': error},
+        );
       });
     } finally {
       if (mounted) {

@@ -8,6 +8,8 @@ import 'package:training_log_app/core/state/providers.dart';
 import 'package:training_log_app/features/workouts/quick_workout_repository.dart';
 import 'package:training_log_app/features/workouts/session_detail_screen.dart';
 
+import '../test_helpers/localized_test_app.dart';
+
 void main() {
   testWidgets('session overview starts in view mode', (tester) async {
     final repository = _FakeQuickWorkoutRepository();
@@ -68,8 +70,8 @@ Future<void> _pumpSessionDetail(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [quickWorkoutRepositoryProvider.overrideWithValue(repository)],
-      child: const MaterialApp(
-        home: SessionDetailScreen(sessionId: 'session_1'),
+      child: localizedTestApp(
+        home: const SessionDetailScreen(sessionId: 'session_1'),
       ),
     ),
   );
@@ -172,4 +174,15 @@ class _FakeQuickWorkoutRepository implements QuickWorkoutRepository {
     int? dayIndex,
     String? sessionName,
   }) async => 'session_1';
+
+  @override
+  Future<WorkoutLoggerSessionReference?> getLastSplitDayWorkoutReference({
+    required String splitId,
+    required int dayIndex,
+  }) async => null;
+
+  @override
+  Future<List<WorkoutLoggerExerciseSessionReference>>
+  getLatestSessionReferencesForExercises(List<String> exerciseIds) async =>
+      const [];
 }

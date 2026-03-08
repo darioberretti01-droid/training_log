@@ -6,16 +6,17 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/state/providers.dart';
+import '../../l10n/app_localizations.dart';
 
 class ExerciseListScreen extends ConsumerWidget {
-  const ExerciseListScreen({super.key, this.title = 'Exercises'});
+  const ExerciseListScreen({super.key, this.title});
 
-  final String title;
+  final String? title;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(title: Text(title ?? context.l10n.tr('Exercises'))),
       body: const ExerciseListContent(),
     );
   }
@@ -25,12 +26,12 @@ class ExerciseSelectionScreen extends StatefulWidget {
   const ExerciseSelectionScreen({
     super.key,
     required this.exercises,
-    this.title = 'Choose exercise',
+    this.title,
     this.selectedExerciseId,
   });
 
   final List<ExerciseWithLabels> exercises;
-  final String title;
+  final String? title;
   final String? selectedExerciseId;
 
   @override
@@ -57,7 +58,9 @@ class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
     final itemSectionCount = _itemSectionCount(sections);
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title ?? context.l10n.tr('Choose exercise')),
+      ),
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -69,10 +72,12 @@ class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
             _buildDivisionAndViewControls(),
             const SizedBox(height: 12),
             if (sections.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
-                  padding: EdgeInsets.all(14),
-                  child: Text('No exercises match the current filter.'),
+                  padding: const EdgeInsets.all(14),
+                  child: Text(
+                    context.l10n.tr('No exercises match the current filter.'),
+                  ),
                 ),
               )
             else
@@ -89,8 +94,8 @@ class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
     return TextField(
       key: const Key('split_builder_exercise_picker_search_field'),
       controller: _searchController,
-      decoration: const InputDecoration(
-        labelText: 'Search exercises',
+      decoration: InputDecoration(
+        labelText: context.l10n.tr('Search exercises'),
         border: OutlineInputBorder(),
         prefixIcon: Icon(Icons.search),
       ),
@@ -109,8 +114,8 @@ class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
             key: const Key('split_builder_exercise_picker_grouping_dropdown'),
             initialValue: _division,
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Division',
+            decoration: InputDecoration(
+              labelText: context.l10n.tr('Division'),
               border: OutlineInputBorder(),
               isDense: true,
             ),
@@ -119,7 +124,8 @@ class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
                   (value) => DropdownMenuItem(
                     value: value,
                     child: Text(
-                      _divisionLabel(value),
+                      _divisionLabel(context, value),
+                      // Localized label for the grouping dropdown.
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -160,16 +166,22 @@ class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
   List<_ExerciseListItem> _toFilteredItems(List<ExerciseWithLabels> exercises) {
     final filtered = <_ExerciseListItem>[];
     for (final exercise in exercises) {
-      if (_query.isNotEmpty && !exercise.name.toLowerCase().contains(_query)) {
+      final localizedName = context.l10n.localizeExerciseName(exercise.name);
+      if (_query.isNotEmpty && !localizedName.toLowerCase().contains(_query)) {
         continue;
       }
       filtered.add(
-        _ExerciseListItem(exercise: exercise, createdAtMs: 0, logCount: 0),
+        _ExerciseListItem(
+          exercise: exercise,
+          createdAtMs: 0,
+          logCount: 0,
+          localizedNameLower: localizedName.toLowerCase(),
+        ),
       );
     }
 
     filtered.sort((a, b) {
-      final byName = a.nameLower.compareTo(b.nameLower);
+      final byName = a.localizedNameLower.compareTo(b.localizedNameLower);
       if (byName != 0) {
         return byName;
       }
@@ -262,7 +274,7 @@ class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(section.title, style: titleStyle),
+          Text(context.l10n.tr(section.title), style: titleStyle),
           const SizedBox(height: 8),
           if (_presentation == _ExercisePresentation.pills)
             Wrap(
@@ -323,10 +335,16 @@ class _ExerciseSelectionScreenState extends State<ExerciseSelectionScreen> {
                           sectionTitle: section.title,
                           itemSectionCount: itemSectionCount,
                         ),
-                        title: Text(item.exercise.name),
+                        title: Text(
+                          context.l10n.localizeExerciseName(item.exercise.name),
+                        ),
                         subtitle: item.exercise.labels.isEmpty
                             ? null
-                            : Text(item.exercise.labels.join(', ')),
+                            : Text(
+                                context.l10n.localizeLabelsJoined(
+                                  item.exercise.labels,
+                                ),
+                              ),
                         trailing: selected ? const Icon(Icons.check) : null,
                         onTap: () => Navigator.of(context).pop(item.exercise),
                       ),
@@ -558,7 +576,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
             (value) => DropdownMenuItem(
               value: value,
               child: Text(
-                _divisionLabel(value),
+                _divisionLabel(context, value),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -575,7 +593,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     final addButton = ActionChip(
       key: const Key('exercises_add_button'),
       avatar: Icon(Icons.add, size: 18, color: addActionColor),
-      label: Text('ADD EXERCISE', style: TextStyle(color: addActionColor)),
+      label: Text(
+        context.l10n.tr('ADD EXERCISE'),
+        style: TextStyle(color: addActionColor),
+      ),
       onPressed: () => context.push('/exercises/new'),
     );
 
@@ -599,8 +620,8 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
       key: const Key('exercises_order_dropdown'),
       initialValue: _ordering,
       isExpanded: true,
-      decoration: const InputDecoration(
-        labelText: 'Ordering',
+      decoration: InputDecoration(
+        labelText: context.l10n.tr('Ordering'),
         border: OutlineInputBorder(),
         isDense: true,
       ),
@@ -609,7 +630,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
             (value) => DropdownMenuItem(
               value: value,
               child: Text(
-                _orderingLabel(value),
+                _orderingLabel(context, value),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -632,7 +653,9 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
         const SizedBox(width: 4),
         IconButton(
           key: const Key('exercises_order_invert_button'),
-          tooltip: _ascending ? 'Ascending' : 'Descending',
+          tooltip: _ascending
+              ? context.l10n.tr('Ascending')
+              : context.l10n.tr('Descending'),
           onPressed: () => setState(() => _ascending = !_ascending),
           icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward),
         ),
@@ -686,8 +709,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                 ),
                 label: Text(
                   _showHiddenExercises
-                      ? 'Visible'
-                      : (isNarrow ? 'Hidden' : 'Hidden exercises'),
+                      ? context.l10n.tr('Visible')
+                      : (isNarrow
+                            ? context.l10n.tr('Hidden')
+                            : context.l10n.tr('Hidden exercises')),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -715,7 +740,9 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
         const SizedBox(width: 8),
         IconButton(
           key: const Key('exercises_delete_mode_button'),
-          tooltip: _isDeleteMode ? 'Exit delete mode' : 'Delete/hide mode',
+          tooltip: _isDeleteMode
+              ? context.l10n.tr('Exit delete mode')
+              : context.l10n.tr('Delete/hide mode'),
           onPressed: _isMutating
               ? null
               : () {
@@ -740,13 +767,14 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
   ) {
     final filtered = <_ExerciseListItem>[];
     for (final exercise in exercises) {
+      final localizedName = context.l10n.localizeExerciseName(exercise.name);
       if (_showHiddenExercises && !exercise.isHidden) {
         continue;
       }
       if (!_showHiddenExercises && exercise.isHidden) {
         continue;
       }
-      if (_query.isNotEmpty && !exercise.name.toLowerCase().contains(_query)) {
+      if (_query.isNotEmpty && !localizedName.toLowerCase().contains(_query)) {
         continue;
       }
       final logCount = exercise.lookupExerciseIds.fold<int>(
@@ -758,6 +786,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
           exercise: exercise,
           createdAtMs: createdAtMap[exercise.id] ?? 0,
           logCount: logCount,
+          localizedNameLower: localizedName.toLowerCase(),
         ),
       );
     }
@@ -769,7 +798,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     int comparison;
     switch (_ordering) {
       case _ExerciseOrdering.alphabetic:
-        comparison = a.nameLower.compareTo(b.nameLower);
+        comparison = a.localizedNameLower.compareTo(b.localizedNameLower);
         break;
       case _ExerciseOrdering.createdAt:
         comparison = a.createdAtMs.compareTo(b.createdAtMs);
@@ -780,7 +809,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     }
 
     if (comparison == 0) {
-      comparison = a.nameLower.compareTo(b.nameLower);
+      comparison = a.localizedNameLower.compareTo(b.localizedNameLower);
     }
     if (comparison == 0) {
       comparison = a.exercise.id.compareTo(b.exercise.id);
@@ -872,7 +901,7 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(section.title, style: titleStyle),
+          Text(context.l10n.tr(section.title), style: titleStyle),
           const SizedBox(height: 8),
           if (_presentation == _ExercisePresentation.pills)
             Wrap(
@@ -930,10 +959,16 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
                           sectionTitle: section.title,
                           itemSectionCount: itemSectionCount,
                         ),
-                        title: Text(item.exercise.name),
+                        title: Text(
+                          context.l10n.localizeExerciseName(item.exercise.name),
+                        ),
                         subtitle: item.exercise.labels.isEmpty
                             ? null
-                            : Text(item.exercise.labels.join(', ')),
+                            : Text(
+                                context.l10n.localizeLabelsJoined(
+                                  item.exercise.labels,
+                                ),
+                              ),
                         onTap: _isMutating
                             ? null
                             : () => _handleExercisePressed(
@@ -997,10 +1032,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
         itemSectionCount: itemSectionCount,
       ),
       tileColor: isArmed ? errorContainer.withValues(alpha: 0.65) : null,
-      title: Text(exercise.name),
+      title: Text(context.l10n.localizeExerciseName(exercise.name)),
       subtitle: exercise.labels.isEmpty
           ? null
-          : Text(exercise.labels.join(', ')),
+          : Text(context.l10n.localizeLabelsJoined(exercise.labels)),
       trailing: exercise.isStandard
           ? OutlinedButton(
               key: _exerciseKey(
@@ -1078,17 +1113,19 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        content: const Text(
-          'Are you sure to delete this exercise? When you exit the Exercises screen, it will not be possible to restore it.',
+        content: Text(
+          context.l10n.tr(
+            'Are you sure to delete this exercise? When you exit the Exercises screen, it will not be possible to restore it.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(context.l10n.tr('Delete')),
           ),
         ],
       ),
@@ -1129,32 +1166,36 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
       builder: (context) {
         if (exercise.isHidden) {
           return AlertDialog(
-            content: const Text('Do you want to restore this exercise?'),
+            content: Text(
+              context.l10n.tr('Do you want to restore this exercise?'),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text(context.l10n.tr('Cancel')),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Restore'),
+                child: Text(context.l10n.tr('Restore')),
               ),
             ],
           );
         }
 
         return AlertDialog(
-          content: const Text(
-            'This exercise is a standard app exercise. It will not be deleted, but you can hide it. Hidden exercises can always be restored',
+          content: Text(
+            context.l10n.tr(
+              'This exercise is a standard app exercise. It will not be deleted, but you can hide it. Hidden exercises can always be restored',
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.tr('Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Hide'),
+              child: Text(context.l10n.tr('Hide')),
             ),
           ],
         );
@@ -1194,7 +1235,7 @@ class _ExercisePillLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labels = exercise.labels.take(3).join(', ');
+    final labels = context.l10n.localizeLabelsJoined(exercise.labels.take(3));
     final secondaryStyle = Theme.of(
       context,
     ).textTheme.labelSmall?.copyWith(fontSize: 10, height: 1.1);
@@ -1205,7 +1246,10 @@ class _ExercisePillLabel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(exercise.name, overflow: TextOverflow.ellipsis),
+          Text(
+            context.l10n.localizeExerciseName(exercise.name),
+            overflow: TextOverflow.ellipsis,
+          ),
           if (labels.isNotEmpty)
             Text(
               labels,
@@ -1223,15 +1267,15 @@ class _ExerciseListItem {
     required this.exercise,
     required this.createdAtMs,
     required this.logCount,
-  }) : nameLower = exercise.name.toLowerCase(),
-       labelsLower = exercise.labels
+    required this.localizedNameLower,
+  }) : labelsLower = exercise.labels
            .map((label) => label.toLowerCase())
            .toSet();
 
   final ExerciseWithLabels exercise;
   final int createdAtMs;
   final int logCount;
-  final String nameLower;
+  final String localizedNameLower;
   final Set<String> labelsLower;
 
   bool matches(Set<String> matchers) => labelsLower.any(matchers.contains);
@@ -1333,29 +1377,29 @@ List<_DivisionSection> _divisionSections(_ExerciseDivision division) {
   }
 }
 
-String _divisionLabel(_ExerciseDivision division) {
+String _divisionLabel(BuildContext context, _ExerciseDivision division) {
   switch (division) {
     case _ExerciseDivision.muscles:
-      return 'Muscles';
+      return context.l10n.tr('Muscles');
     case _ExerciseDivision.pushPullLegs:
-      return 'Push-pull-legs';
+      return context.l10n.tr('Push-pull-legs');
     case _ExerciseDivision.upperLower:
-      return 'Upper-lower';
+      return context.l10n.tr('Upper-lower');
     case _ExerciseDivision.compoundIsolation:
-      return 'Compound-isolation';
+      return context.l10n.tr('Compound-isolation');
     case _ExerciseDivision.allExercises:
-      return 'All exercises';
+      return context.l10n.tr('All exercises');
   }
 }
 
-String _orderingLabel(_ExerciseOrdering ordering) {
+String _orderingLabel(BuildContext context, _ExerciseOrdering ordering) {
   switch (ordering) {
     case _ExerciseOrdering.alphabetic:
-      return 'Alphabetic order';
+      return context.l10n.tr('Alphabetic order');
     case _ExerciseOrdering.createdAt:
-      return 'Date of creation';
+      return context.l10n.tr('Date of creation');
     case _ExerciseOrdering.mostUsed:
-      return 'Most used';
+      return context.l10n.tr('Most used');
   }
 }
 

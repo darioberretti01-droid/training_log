@@ -8,6 +8,8 @@ import 'package:training_log_app/devtools/demo_fixture_models.dart';
 import 'package:training_log_app/devtools/demo_fixture_service.dart';
 import 'package:training_log_app/features/home/home_screen.dart';
 
+import '../test_helpers/localized_test_app.dart';
+
 class _MockDemoFixtureService extends Mock implements DemoFixtureService {}
 
 void main() {
@@ -32,7 +34,9 @@ void main() {
               () => DateTime(2026, 2, 23, 9, 30),
             ),
           ],
-          child: const MaterialApp(home: Scaffold(body: OtherTabContent())),
+          child: localizedTestApp(
+            home: const Scaffold(body: OtherTabContent()),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -60,7 +64,7 @@ void main() {
             () => DateTime(2026, 2, 23, 9, 30),
           ),
         ],
-        child: const MaterialApp(home: Scaffold(body: OtherTabContent())),
+        child: localizedTestApp(home: const Scaffold(body: OtherTabContent())),
       ),
     );
     await tester.pumpAndSettle();
@@ -97,7 +101,9 @@ void main() {
             demoFixtureServiceProvider.overrideWithValue(service),
             appClockProvider.overrideWithValue(() => fixedNow),
           ],
-          child: const MaterialApp(home: Scaffold(body: OtherTabContent())),
+          child: localizedTestApp(
+            home: const Scaffold(body: OtherTabContent()),
+          ),
         ),
       );
       await tester.pumpAndSettle();

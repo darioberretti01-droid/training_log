@@ -2,10 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/state/providers.dart';
 import '../../devtools/demo_fixture_models.dart';
+import '../../l10n/app_localizations.dart';
 import '../splits/split_repository.dart';
 import '../workouts/workout_draft.dart';
 import '../workouts/quick_workout_repository.dart';
@@ -16,6 +16,7 @@ class HomeTabContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final suggestedState = ref.watch(suggestedWorkoutCardStateProvider);
     final splitsState = ref.watch(splitsProvider);
     final activeSplitState = ref.watch(activeSplitProvider);
@@ -28,15 +29,18 @@ class HomeTabContent extends ConsumerWidget {
       key: const Key('home_scroll_view'),
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Home', style: Theme.of(context).textTheme.headlineMedium),
+        Text(
+          l10n.tr('Home'),
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
         const SizedBox(height: 6),
         Text(
-          _activeSplitLine(activeSplitState),
+          _activeSplitLine(context, activeSplitState),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 2),
         Text(
-          _lastSessionLine(lastSessionState),
+          _lastSessionLine(context, lastSessionState),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         if (kDebugMode) ...[
@@ -62,7 +66,10 @@ class HomeTabContent extends ConsumerWidget {
           },
         ),
         const SizedBox(height: 20),
-        Text('Recent sessions', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          l10n.tr('Recent sessions'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         _RecentSessionsSection(
           state: recentSessionsState,
@@ -86,7 +93,7 @@ class _HomeDebugDraftBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final text = _debugText(draft);
+    final text = _debugText(context, draft);
     return Container(
       key: const Key('home_debug_draft_banner'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -104,45 +111,62 @@ class _HomeDebugDraftBanner extends StatelessWidget {
     );
   }
 
-  String _debugText(WorkoutDraft? draft) {
+  String _debugText(BuildContext context, WorkoutDraft? draft) {
+    final l10n = context.l10n;
     if (draft == null) {
-      return 'DEBUG draft: none';
+      return l10n.tr('DEBUG draft: none');
     }
     final updated = DateTime.fromMillisecondsSinceEpoch(draft.updatedAtMs);
-    final updatedLabel = DateFormat('MMM d HH:mm:ss').format(updated);
+    final updatedLabel = l10n.formatMonthDayTimeSeconds(updated);
     final splitLabel = draft.splitId ?? '-';
     final dayLabel = draft.dayIndex?.toString() ?? '-';
-    return 'DEBUG draft: mode=${draft.mode}, split=$splitLabel, day=$dayLabel, updated=$updatedLabel';
+    return l10n.format(
+      'DEBUG draft: mode={mode}, split={split}, day={day}, updated={updated}',
+      {
+        'mode': draft.mode,
+        'split': splitLabel,
+        'day': dayLabel,
+        'updated': updatedLabel,
+      },
+    );
   }
 }
 
-String _activeSplitLine(AsyncValue<SplitSummary?> state) {
+String _activeSplitLine(BuildContext context, AsyncValue<SplitSummary?> state) {
+  final l10n = context.l10n;
   return state.when(
     data: (split) {
       if (split == null) {
-        return 'Active split: none';
+        return l10n.tr('Active split: none');
       }
-      return 'Active split: ${split.name}';
+      return l10n.format('Active split: {name}', {'name': split.name});
     },
-    loading: () => 'Active split: loading...',
-    error: (_, _) => 'Active split: unavailable',
+    loading: () => l10n.tr('Active split: loading...'),
+    error: (_, _) => l10n.tr('Active split: unavailable'),
   );
 }
 
-String _lastSessionLine(AsyncValue<HomeSessionOverviewEntry?> state) {
+String _lastSessionLine(
+  BuildContext context,
+  AsyncValue<HomeSessionOverviewEntry?> state,
+) {
+  final l10n = context.l10n;
   return state.when(
     data: (session) {
       if (session == null) {
-        return 'Last session: No sessions yet';
+        return l10n.tr('Last session: No sessions yet');
       }
       final startedAt = DateTime.fromMillisecondsSinceEpoch(
         session.session.startedAt,
       );
-      final label = _sessionDisplayName(session);
-      return 'Last session: $label | ${DateFormat('MMM d').format(startedAt)}';
+      final label = _sessionDisplayName(context, session);
+      return l10n.format('Last session: {label} | {date}', {
+        'label': label,
+        'date': l10n.formatMonthDay(startedAt),
+      });
     },
-    loading: () => 'Last session: loading...',
-    error: (_, _) => 'Last session: unavailable',
+    loading: () => l10n.tr('Last session: loading...'),
+    error: (_, _) => l10n.tr('Last session: unavailable'),
   );
 }
 
@@ -200,6 +224,7 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
   }
 
   Widget _buildSuggestedContent(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final activeSplit = activeSplitState.maybeWhen(
       data: (value) => value,
       orElse: () => null,
@@ -213,8 +238,8 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
       data: (suggested) {
         if (suggested == null) {
           final primaryLabel = hasCurrentSplit
-              ? 'Log current split'
-              : 'Set current split';
+              ? l10n.tr('Log current split')
+              : l10n.tr('Set current split');
           final primaryAction = hasCurrentSplit || splits.isEmpty
               ? null
               : () => _openSetCurrentSplitPicker(context, ref, splits);
@@ -223,14 +248,18 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Next workout',
+                l10n.tr('Next workout'),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
               Text(
                 hasCurrentSplit
-                    ? 'Current split has no available workout suggestion.'
-                    : 'Set an active split to get a workout suggestion.',
+                    ? l10n.tr(
+                        'Current split has no available workout suggestion.',
+                      )
+                    : l10n.tr(
+                        'Set an active split to get a workout suggestion.',
+                      ),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 12),
@@ -247,17 +276,23 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Next workout',
+              l10n.tr('Next workout'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 6),
             Text(
-              'Day ${suggested.nextDayIndex}: ${suggested.nextDayName}',
+              l10n.format('Day {day}: {title}', {
+                'day': suggested.nextDayIndex,
+                'title': suggested.nextDayName,
+              }),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 6),
             Text(
-              '${suggested.exerciseCount} exercises | ~${suggested.estimatedDurationMinutes} min',
+              l10n.format('{count} exercises | ~{minutes} min', {
+                'count': suggested.exerciseCount,
+                'minutes': suggested.estimatedDurationMinutes,
+              }),
             ),
             if (suggested.previewExerciseNames.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -275,13 +310,15 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
               onPressed: () {
                 _openSuggestedWorkout(context, suggested);
               },
-              child: const Text('Log current split'),
+              child: Text(l10n.tr('Log current split')),
             ),
           ],
         );
       },
-      loading: () => const Text('Loading next workout...'),
-      error: (error, _) => Text('Could not load next workout: $error'),
+      loading: () => Text(l10n.tr('Loading next workout...')),
+      error: (error, _) => Text(
+        l10n.format('Could not load next workout: {error}', {'error': error}),
+      ),
     );
   }
 
@@ -290,6 +327,7 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
     WidgetRef ref,
     HomeSplitRecoveryState recoveryState,
   ) {
+    final l10n = context.l10n;
     final suggested = suggestedState.maybeWhen(
       data: (value) => value,
       orElse: () => null,
@@ -303,8 +341,8 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
         const <SplitSummary>[];
     final hasCurrentSplit = activeSplit != null;
     final secondaryActionLabel = hasCurrentSplit
-        ? 'Log new current split'
-        : 'Set current split';
+        ? l10n.tr('Log new current split')
+        : l10n.tr('Set current split');
     final secondaryAction = hasCurrentSplit
         ? (suggested == null
               ? null
@@ -316,19 +354,24 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Next workout', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          l10n.tr('Next workout'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Text(
           recoveryState.wasLastUsedSplitDeleted
-              ? 'Your last used split was deleted.'
-              : 'Your last used split is not the current split.',
+              ? l10n.tr('Your last used split was deleted.')
+              : l10n.tr('Your last used split is not the current split.'),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         if (!recoveryState.wasLastUsedSplitDeleted &&
             recoveryState.lastUsedSplitName != null) ...[
           const SizedBox(height: 4),
           Text(
-            'Last used: ${recoveryState.lastUsedSplitName}',
+            l10n.format('Last used: {name}', {
+              'name': recoveryState.lastUsedSplitName,
+            }),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -339,9 +382,9 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
               context,
               ref,
               recoveryState.lastUsedSplitId,
-              'Set last used split as current.',
+              l10n.tr('Set last used split as current.'),
             ),
-            child: const Text('Set last used split as current'),
+            child: Text(l10n.tr('Set last used split as current')),
           ),
         if (recoveryState.canRestoreLastUsedSplit) const SizedBox(height: 8),
         OutlinedButton(
@@ -374,7 +417,13 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not set active split: $error')),
+        SnackBar(
+          content: Text(
+            context.l10n.format('Could not set active split: {error}', {
+              'error': error,
+            }),
+          ),
+        ),
       );
     }
   }
@@ -395,11 +444,11 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
                 (split) => ListTile(
                   title: Text(split.name),
                   subtitle: Text(
-                    split.dayCount == 1 ? '1 day' : '${split.dayCount} days',
+                    hostContext.l10n.dayCountLabel(split.dayCount),
                   ),
                   trailing: split.isActive
-                      ? const Chip(
-                          label: Text('Current'),
+                      ? Chip(
+                          label: Text(hostContext.l10n.tr('Current')),
                           visualDensity: VisualDensity.compact,
                         )
                       : null,
@@ -409,7 +458,7 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
                       hostContext,
                       ref,
                       split.id,
-                      'Current split updated.',
+                      hostContext.l10n.tr('Current split updated.'),
                     );
                   },
                 ),
@@ -432,20 +481,24 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
   }
 
   Widget _buildResumeContent(BuildContext context, WorkoutDraft draft) {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Next workout', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          l10n.tr('Next workout'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Text(
-          'You have an in-progress workout from today.',
+          l10n.tr('You have an in-progress workout from today.'),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
         FilledButton(
           key: const Key('home_keep_logging_today'),
           onPressed: () => _openDraftWorkout(context, draft),
-          child: const Text("Keep logging today's workout"),
+          child: Text(l10n.tr("Keep logging today's workout")),
         ),
       ],
     );
@@ -499,7 +552,7 @@ class _SecondaryActionsRow extends ConsumerWidget {
             loading: () => null,
             error: (_, _) => null,
           ),
-          child: const Text('Log different split'),
+          child: Text(context.l10n.tr('Log different split')),
         ),
         OutlinedButton(
           key: const Key('home_log_different_day'),
@@ -517,17 +570,17 @@ class _SecondaryActionsRow extends ConsumerWidget {
             loading: () => null,
             error: (_, _) => null,
           ),
-          child: const Text('Log different day'),
+          child: Text(context.l10n.tr('Log different day')),
         ),
         OutlinedButton(
           key: const Key('home_free_workout'),
           onPressed: () => context.push('/workout-logger?mode=free'),
-          child: const Text('Free workout'),
+          child: Text(context.l10n.tr('Free workout')),
         ),
         OutlinedButton(
           key: const Key('home_create_split'),
           onPressed: () => context.push('/splits/builder'),
-          child: const Text('Create new split'),
+          child: Text(context.l10n.tr('Create new split')),
         ),
       ],
     );
@@ -550,11 +603,11 @@ class _SecondaryActionsRow extends ConsumerWidget {
                 (split) => ListTile(
                   title: Text(split.name),
                   subtitle: Text(
-                    split.dayCount == 1 ? '1 day' : '${split.dayCount} days',
+                    hostContext.l10n.dayCountLabel(split.dayCount),
                   ),
                   trailing: split.isActive
-                      ? const Chip(
-                          label: Text('Current'),
+                      ? Chip(
+                          label: Text(hostContext.l10n.tr('Current')),
                           visualDensity: VisualDensity.compact,
                         )
                       : null,
@@ -568,8 +621,12 @@ class _SecondaryActionsRow extends ConsumerWidget {
                     }
                     if (splitDetails == null || splitDetails.days.isEmpty) {
                       ScaffoldMessenger.of(hostContext).showSnackBar(
-                        const SnackBar(
-                          content: Text('Selected split has no workout days.'),
+                        SnackBar(
+                          content: Text(
+                            hostContext.l10n.tr(
+                              'Selected split has no workout days.',
+                            ),
+                          ),
                         ),
                       );
                       return;
@@ -609,8 +666,15 @@ class _SecondaryActionsRow extends ConsumerWidget {
             ),
             ...split.days.map(
               (day) => ListTile(
-                title: Text('Day ${day.dayIndex}: ${day.title}'),
-                subtitle: Text('${day.plannedExercises.length} exercises'),
+                title: Text(
+                  context.l10n.format('Day {day}: {title}', {
+                    'day': day.dayIndex,
+                    'title': day.title,
+                  }),
+                ),
+                subtitle: Text(
+                  context.l10n.exerciseCountLabel(day.plannedExercises.length),
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   onPickDay(split.id, day.dayIndex);
@@ -635,10 +699,10 @@ class _RecentSessionsSection extends StatelessWidget {
     return state.when(
       data: (sessions) {
         if (sessions.isEmpty) {
-          return const Card(
+          return Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No sessions logged yet.'),
+              padding: const EdgeInsets.all(16),
+              child: Text(context.l10n.tr('No sessions logged yet.')),
             ),
           );
         }
@@ -654,10 +718,10 @@ class _RecentSessionsSection extends StatelessWidget {
               .toList(growable: false),
         );
       },
-      loading: () => const Card(
+      loading: () => Card(
         child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Loading recent sessions...'),
+          padding: const EdgeInsets.all(16),
+          child: Text(context.l10n.tr('Loading recent sessions...')),
         ),
       ),
       error: (error, _) => Card(
@@ -666,9 +730,16 @@ class _RecentSessionsSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Failed to load recent sessions: $error'),
+              Text(
+                context.l10n.format('Failed to load recent sessions: {error}', {
+                  'error': error,
+                }),
+              ),
               const SizedBox(height: 10),
-              FilledButton(onPressed: onRetry, child: const Text('Retry')),
+              FilledButton(
+                onPressed: onRetry,
+                child: Text(context.l10n.tr('Retry')),
+              ),
             ],
           ),
         ),
@@ -687,36 +758,42 @@ class _HomeSessionCard extends StatelessWidget {
     final startedAt = DateTime.fromMillisecondsSinceEpoch(
       entry.session.startedAt,
     );
-    final title =
-        '${_sessionDisplayName(entry)} - ${DateFormat('MMM d').format(startedAt)}';
+    final title = context.l10n.format('Last session: {label} | {date}', {
+      'label': _sessionDisplayName(context, entry),
+      'date': context.l10n.formatMonthDay(startedAt),
+    });
 
     return Card(
       child: ListTile(
         key: Key('home_recent_session_${entry.session.id}'),
         onTap: () => context.push('/sessions/${entry.session.id}'),
         title: Text(title),
-        subtitle: Text('${entry.totalSets} sets'),
+        subtitle: Text(context.l10n.setCountLabel(entry.totalSets)),
       ),
     );
   }
 }
 
-String _sessionDisplayName(HomeSessionOverviewEntry entry) {
+String _sessionDisplayName(
+  BuildContext context,
+  HomeSessionOverviewEntry entry,
+) {
   final explicit = entry.sessionName?.trim();
   if (explicit != null && explicit.isNotEmpty) {
     return explicit;
   }
 
+  final l10n = context.l10n;
   switch (entry.session.sessionType) {
     case WorkoutSessionMode.splitDay:
       if (entry.dayIndex != null) {
-        return 'Day ${entry.dayIndex}';
+        return l10n.format('Day {day}', {'day': entry.dayIndex});
       }
-      return 'Split workout';
+      return l10n.tr('Split workout');
     case WorkoutSessionMode.free:
-      return 'Free workout';
+      return l10n.tr('Free workout');
     default:
-      return 'Quick workout';
+      return l10n.tr('Quick workout');
   }
 }
 
@@ -738,11 +815,13 @@ class OtherTabContent extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const _LanguageSettingsCard(),
+          const SizedBox(height: 12),
           Card(
             child: ListTile(
               key: const Key('other_labels_item'),
-              title: const Text('Labels'),
-              subtitle: const Text('Browse and create labels'),
+              title: Text(context.l10n.tr('Labels')),
+              subtitle: Text(context.l10n.tr('Browse and create labels')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/other/labels'),
             ),
@@ -751,8 +830,8 @@ class OtherTabContent extends ConsumerWidget {
           Card(
             child: ListTile(
               key: const Key('other_debug_tools_item'),
-              title: const Text('Debug tools'),
-              subtitle: const Text('Protected developer utilities'),
+              title: Text(context.l10n.tr('Debug tools')),
+              subtitle: Text(context.l10n.tr('Protected developer utilities')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _openDebugTools(context),
             ),
@@ -781,13 +860,127 @@ class OtherTabContent extends ConsumerWidget {
   }
 }
 
+class _LanguageSettingsCard extends ConsumerWidget {
+  const _LanguageSettingsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final appLocaleState = ref.watch(appLocaleProvider);
+    final selectedLocale = appLocaleState.maybeWhen(
+      data: (value) => value,
+      orElse: () => null,
+    );
+    final subtitle = l10n.languageDisplayName(selectedLocale?.languageCode);
+
+    return Card(
+      child: ListTile(
+        key: const Key('other_language_item'),
+        title: Text(l10n.tr('Language')),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _showLanguagePicker(context, ref, selectedLocale),
+      ),
+    );
+  }
+
+  Future<void> _showLanguagePicker(
+    BuildContext context,
+    WidgetRef ref,
+    Locale? selectedLocale,
+  ) async {
+    final l10n = context.l10n;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final selectedLanguageCode = selectedLocale?.languageCode;
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                title: Text(
+                  l10n.tr('Language'),
+                  style: Theme.of(sheetContext).textTheme.titleMedium,
+                ),
+                subtitle: Text(l10n.tr('Choose app language')),
+              ),
+              _LanguageOptionTile(
+                key: const Key('language_option_system'),
+                label: l10n.tr('Follow system language'),
+                selected: selectedLanguageCode == null,
+                onTap: () async {
+                  await ref.read(appLocaleProvider.notifier).useSystemLocale();
+                  if (sheetContext.mounted) {
+                    Navigator.of(sheetContext).pop();
+                  }
+                },
+              ),
+              _LanguageOptionTile(
+                key: const Key('language_option_en'),
+                label: l10n.tr('English'),
+                selected: selectedLanguageCode == 'en',
+                onTap: () async {
+                  await ref
+                      .read(appLocaleProvider.notifier)
+                      .setLanguageCode('en');
+                  if (sheetContext.mounted) {
+                    Navigator.of(sheetContext).pop();
+                  }
+                },
+              ),
+              _LanguageOptionTile(
+                key: const Key('language_option_it'),
+                label: l10n.tr('Italian'),
+                selected: selectedLanguageCode == 'it',
+                onTap: () async {
+                  await ref
+                      .read(appLocaleProvider.notifier)
+                      .setLanguageCode('it');
+                  if (sheetContext.mounted) {
+                    Navigator.of(sheetContext).pop();
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LanguageOptionTile extends StatelessWidget {
+  const _LanguageOptionTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(label),
+      trailing: selected ? const Icon(Icons.check) : null,
+      onTap: onTap,
+    );
+  }
+}
+
 class DebugToolsScreen extends StatelessWidget {
   const DebugToolsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Debug tools')),
+      appBar: AppBar(title: Text(context.l10n.tr('Debug tools'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: const [_DebugToolsCard()],
@@ -815,7 +1008,10 @@ class _DebugToolsCardState extends ConsumerState<_DebugToolsCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Debug tools', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              context.l10n.tr('Debug tools'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 10),
             FilledButton(
               key: const Key('debug_seed_demo_data'),
@@ -826,13 +1022,13 @@ class _DebugToolsCardState extends ConsumerState<_DebugToolsCard> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Reset + seed demo data'),
+                  : Text(context.l10n.tr('Reset + seed demo data')),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               key: const Key('debug_reset_all_data'),
               onPressed: _isWorking ? null : _resetAllData,
-              child: const Text('Reset all data'),
+              child: Text(context.l10n.tr('Reset all data')),
             ),
           ],
         ),
@@ -850,7 +1046,7 @@ class _DebugToolsCardState extends ConsumerState<_DebugToolsCard> {
               now: ref.read(appClockProvider)(),
             );
       },
-      successMessage: 'Demo fixture restored.',
+      successMessage: context.l10n.tr('Demo fixture restored.'),
     );
   }
 
@@ -859,7 +1055,7 @@ class _DebugToolsCardState extends ConsumerState<_DebugToolsCard> {
       action: () async {
         await ref.read(demoFixtureServiceProvider).resetAllData();
       },
-      successMessage: 'All local data has been reset.',
+      successMessage: context.l10n.tr('All local data has been reset.'),
     );
   }
 
@@ -882,9 +1078,15 @@ class _DebugToolsCardState extends ConsumerState<_DebugToolsCard> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Debug action failed: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.l10n.format('Debug action failed: {error}', {
+              'error': error,
+            }),
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isWorking = false);
@@ -931,14 +1133,14 @@ class _DebugToolsPasswordDialogState extends State<_DebugToolsPasswordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Unlock debug tools'),
+      title: Text(context.l10n.tr('Unlock debug tools')),
       content: TextField(
         key: const Key('debug_tools_password_field'),
         controller: _controller,
         autofocus: true,
         obscureText: true,
         decoration: InputDecoration(
-          labelText: 'Password',
+          labelText: context.l10n.tr('Password'),
           errorText: _errorText.isEmpty ? null : _errorText,
         ),
         onSubmitted: (_) => _submit(),
@@ -946,12 +1148,12 @@ class _DebugToolsPasswordDialogState extends State<_DebugToolsPasswordDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.tr('Cancel')),
         ),
         FilledButton(
           key: const Key('debug_tools_password_submit'),
           onPressed: _submit,
-          child: const Text('Unlock'),
+          child: Text(context.l10n.tr('Unlock')),
         ),
       ],
     );
@@ -964,7 +1166,7 @@ class _DebugToolsPasswordDialogState extends State<_DebugToolsPasswordDialog> {
     }
 
     setState(() {
-      _errorText = 'Incorrect password';
+      _errorText = context.l10n.tr('Incorrect password');
     });
   }
 }

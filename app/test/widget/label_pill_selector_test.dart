@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:training_log_app/core/widgets/label_pill_selector.dart';
 
+import '../test_helpers/localized_test_app.dart';
+
 void main() {
   testWidgets('add action shows ADD LABEL with same color as plus icon', (
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
+      localizedTestApp(
+        home: const Scaffold(
           body: _SelectorHost(
             availableLabels: ['chest', 'back'],
             initialSelected: [],
@@ -16,8 +18,11 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    final addChip = tester.widget<ActionChip>(find.byKey(const Key('label_selector_add')));
+    final addChip = tester.widget<ActionChip>(
+      find.byKey(const Key('label_selector_add')),
+    );
     final label = addChip.label as Text;
     final icon = addChip.avatar as Icon;
 
@@ -25,64 +30,74 @@ void main() {
     expect(label.style?.color, icon.color);
   });
 
-  testWidgets('search with no matches still shows ADD LABEL and keeps selection', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: _SelectorHost(
-            availableLabels: ['chest', 'back'],
-            initialSelected: ['chest'],
+  testWidgets(
+    'search with no matches still shows ADD LABEL and keeps selection',
+    (tester) async {
+      await tester.pumpWidget(
+        localizedTestApp(
+          home: const Scaffold(
+            body: _SelectorHost(
+              availableLabels: ['chest', 'back'],
+              initialSelected: ['chest'],
+            ),
           ),
         ),
-      ),
-    );
+      );
+      await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const Key('label_selector_search')), 'zzz');
-    await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('label_selector_search')),
+        'zzz',
+      );
+      await tester.pump();
 
-    expect(find.byType(FilterChip), findsNothing);
-    expect(find.byKey(const Key('label_selector_add')), findsOneWidget);
+      expect(find.byType(FilterChip), findsNothing);
+      expect(find.byKey(const Key('label_selector_add')), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('label_selector_search')), '');
-    await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('label_selector_search')),
+        '',
+      );
+      await tester.pump();
 
-    final chestChip = tester.widget<FilterChip>(
-      find.widgetWithText(FilterChip, 'chest'),
-    );
-    expect(chestChip.selected, isTrue);
-  });
+      final chestChip = tester.widget<FilterChip>(
+        find.widgetWithText(FilterChip, 'chest'),
+      );
+      expect(chestChip.selected, isTrue);
+    },
+  );
 
-  testWidgets('cancel add-label dialog does not crash or call create callback', (
-    tester,
-  ) async {
-    var createCalls = 0;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: _SelectorHost(
-            availableLabels: const ['chest'],
-            initialSelected: const [],
-            onCreateLabel: (_) async {
-              createCalls += 1;
-              return true;
-            },
+  testWidgets(
+    'cancel add-label dialog does not crash or call create callback',
+    (tester) async {
+      var createCalls = 0;
+      await tester.pumpWidget(
+        localizedTestApp(
+          home: Scaffold(
+            body: _SelectorHost(
+              availableLabels: const ['chest'],
+              initialSelected: const [],
+              onCreateLabel: (_) async {
+                createCalls += 1;
+                return true;
+              },
+            ),
           ),
         ),
-      ),
-    );
+      );
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('label_selector_add')));
-    await tester.pumpAndSettle();
-    expect(find.text('Create Label'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('label_selector_add')));
+      await tester.pumpAndSettle();
+      expect(find.text('Create Label'), findsOneWidget);
 
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
 
-    expect(createCalls, 0);
-    expect(tester.takeException(), isNull);
-  });
+      expect(createCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('adding label normalizes and auto-selects created label', (
     tester,
@@ -91,7 +106,7 @@ void main() {
     List<String> selected = const [];
 
     await tester.pumpWidget(
-      MaterialApp(
+      localizedTestApp(
         home: Scaffold(
           body: _SelectorHost(
             availableLabels: const ['chest'],
@@ -107,6 +122,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('label_selector_add')));
     await tester.pumpAndSettle();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/label_pill_selector.dart';
+import '../../l10n/app_localizations.dart';
 import 'split_volume.dart';
 
 class SplitBuilderMuscleVolumeCard extends StatefulWidget {
@@ -24,11 +25,13 @@ class SplitBuilderMuscleVolumeCard extends StatefulWidget {
       _SplitBuilderMuscleVolumeCardState();
 }
 
-class _SplitBuilderMuscleVolumeCardState extends State<SplitBuilderMuscleVolumeCard> {
+class _SplitBuilderMuscleVolumeCardState
+    extends State<SplitBuilderMuscleVolumeCard> {
   bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Card(
       key: const Key('split_builder_volume_overview'),
       child: Padding(
@@ -40,15 +43,15 @@ class _SplitBuilderMuscleVolumeCardState extends State<SplitBuilderMuscleVolumeC
               children: [
                 Expanded(
                   child: Text(
-                    'Volume by muscle (sets)',
+                    l10n.tr('Volume by muscle (sets)'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
                 IconButton(
                   key: const Key('split_builder_volume_toggle'),
                   tooltip: _isExpanded
-                      ? 'Collapse volume by muscle'
-                      : 'Expand volume by muscle',
+                      ? l10n.tr('Collapse volume by muscle')
+                      : l10n.tr('Expand volume by muscle'),
                   onPressed: () => setState(() => _isExpanded = !_isExpanded),
                   icon: Icon(
                     _isExpanded ? Icons.expand_less : Icons.expand_more,
@@ -59,15 +62,18 @@ class _SplitBuilderMuscleVolumeCardState extends State<SplitBuilderMuscleVolumeC
             if (_isExpanded) ...[
               const SizedBox(height: 4),
               Text(
-                'Based on exercise labels. Each exercise contributes all sets '
-                'to each selected control label it has.',
+                l10n.tr(
+                  'Based on exercise labels. Each exercise contributes all sets to each selected control label it has.',
+                ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 10),
               Row(
                 children: [
                   Text(
-                    'Whole split (${widget.summary.totalPlannedSets} planned sets)',
+                    l10n.format('Whole split ({count} planned sets)', {
+                      'count': widget.summary.totalPlannedSets,
+                    }),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const Spacer(),
@@ -75,22 +81,29 @@ class _SplitBuilderMuscleVolumeCardState extends State<SplitBuilderMuscleVolumeC
                     key: const Key('split_volume_control_labels_button'),
                     onPressed: () => _openControlLabelsDialog(context),
                     icon: const Icon(Icons.tune, size: 16),
-                    label: const Text('Control labels'),
+                    label: Text(l10n.tr('Control labels')),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               if (!widget.summary.hasTrackedMuscles)
-                const Text(
-                  'Select at least one control label to track muscle volume.',
+                Text(
+                  l10n.tr(
+                    'Select at least one control label to track muscle volume.',
+                  ),
                 )
               else ...[
                 _VolumeBars(
                   volumes: widget.summary.totalMuscleVolumes,
-                  emptyText: 'No tracked control labels in this split yet.',
+                  emptyText: l10n.tr(
+                    'No tracked control labels in this split yet.',
+                  ),
                 ),
                 const SizedBox(height: 12),
-                Text('By day', style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  l10n.tr('By day'),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 const SizedBox(height: 8),
                 ...widget.summary.daySummaries.map(
                   (day) => Padding(
@@ -107,6 +120,7 @@ class _SplitBuilderMuscleVolumeCardState extends State<SplitBuilderMuscleVolumeC
   }
 
   Future<void> _openControlLabelsDialog(BuildContext context) async {
+    final l10n = context.l10n;
     final draftSelection = [...widget.selectedControlLabels];
     await showDialog<void>(
       context: context,
@@ -115,7 +129,7 @@ class _SplitBuilderMuscleVolumeCardState extends State<SplitBuilderMuscleVolumeC
           builder: (context, setDialogState) {
             return AlertDialog(
               key: const Key('split_volume_control_labels_dialog'),
-              title: const Text('Control Labels'),
+              title: Text(l10n.tr('Control Labels')),
               content: SizedBox(
                 width: 420,
                 child: LabelPillSelector(
@@ -129,21 +143,21 @@ class _SplitBuilderMuscleVolumeCardState extends State<SplitBuilderMuscleVolumeC
                     });
                   },
                   onCreateLabel: widget.onCreateControlLabel,
-                  searchHintText: 'Search control labels',
-                  emptyText: 'No labels available.',
+                  searchHintText: l10n.tr('Search control labels'),
+                  emptyText: l10n.tr('No labels available.'),
                 ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text(l10n.tr('Cancel')),
                 ),
                 FilledButton(
                   onPressed: () {
                     widget.onControlLabelsChanged(draftSelection);
                     Navigator.of(context).pop();
                   },
-                  child: const Text('Apply'),
+                  child: Text(l10n.tr('Apply')),
                 ),
               ],
             );
@@ -161,6 +175,7 @@ class _BuilderDayMuscleVolumeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final dayVolumes = day.muscleVolumes
         .where((volume) => volume.setCount > 0)
         .toList(growable: false);
@@ -176,13 +191,18 @@ class _BuilderDayMuscleVolumeCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${day.displayLabel} (${day.plannedSetCount} sets)',
+              l10n.format('{label} ({count} sets)', {
+                'label': day.displayLabel,
+                'count': day.plannedSetCount,
+              }),
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
             _VolumeBars(
               volumes: dayVolumes,
-              emptyText: 'No selected control labels present in this day.',
+              emptyText: l10n.tr(
+                'No selected control labels present in this day.',
+              ),
             ),
           ],
         ),
@@ -206,6 +226,7 @@ class _VolumeBars extends StatelessWidget {
     final maxSets = volumes
         .map((entry) => entry.setCount)
         .reduce((a, b) => a > b ? a : b);
+    final l10n = context.l10n;
 
     return Column(
       children: volumes
@@ -217,7 +238,7 @@ class _VolumeBars extends StatelessWidget {
                   SizedBox(
                     width: 110,
                     child: Text(
-                      volume.muscleLabel,
+                      l10n.localizeLabelName(volume.muscleLabel),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -249,6 +270,7 @@ class SplitDetailMuscleVolumeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Card(
       key: const Key('split_detail_volume_overview'),
       child: Padding(
@@ -257,15 +279,21 @@ class SplitDetailMuscleVolumeCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Volume by muscle (sets)',
+              l10n.tr('Volume by muscle (sets)'),
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 6),
             if (!summary.hasTrackedMuscles)
-              const Text('No control labels selected.')
+              Text(l10n.tr('No control labels selected.'))
             else ...[
               Text(
-                'Whole split: ${_inlineVolume(summary.totalMuscleVolumes, maxItems: 8)}',
+                l10n.format('Whole split: {value}', {
+                  'value': _inlineVolume(
+                    context,
+                    summary.totalMuscleVolumes,
+                    maxItems: 8,
+                  ),
+                }),
               ),
               const SizedBox(height: 6),
               ...summary.daySummaries.map(
@@ -273,7 +301,7 @@ class SplitDetailMuscleVolumeCard extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     '${day.displayLabel}: '
-                    '${_inlineVolume(_nonZero(day.muscleVolumes), maxItems: 8)}',
+                    '${_inlineVolume(context, _nonZero(day.muscleVolumes), maxItems: 8)}',
                   ),
                 ),
               ),
@@ -285,18 +313,26 @@ class SplitDetailMuscleVolumeCard extends StatelessWidget {
   }
 }
 
-String _inlineVolume(List<MuscleSetVolume> volumes, {required int maxItems}) {
+String _inlineVolume(
+  BuildContext context,
+  List<MuscleSetVolume> volumes, {
+  required int maxItems,
+}) {
   if (volumes.isEmpty) {
-    return 'No tracked labels';
+    return context.l10n.tr('No tracked labels');
   }
 
+  final l10n = context.l10n;
   final shown = volumes.take(maxItems).toList(growable: false);
   final parts = shown
-      .map((volume) => '${volume.muscleLabel} ${volume.setCount}')
+      .map(
+        (volume) =>
+            '${l10n.localizeLabelName(volume.muscleLabel)} ${volume.setCount}',
+      )
       .toList(growable: false);
   final remaining = volumes.length - shown.length;
   if (remaining > 0) {
-    parts.add('+$remaining more');
+    parts.add(l10n.format('+{count} more', {'count': remaining}));
   }
   return parts.join(', ');
 }

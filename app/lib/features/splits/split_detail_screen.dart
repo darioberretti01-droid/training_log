@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/state/providers.dart';
+import '../../l10n/app_localizations.dart';
 import 'split_repository.dart';
 import 'split_volume.dart';
 import 'split_volume_widgets.dart';
@@ -23,18 +23,19 @@ class _SplitDetailScreenState extends ConsumerState<SplitDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final detailsState = ref.watch(splitDetailsProvider(widget.splitId));
     return Scaffold(
       appBar: AppBar(
         title: detailsState.when(
-          data: (details) => Text(details?.name ?? 'Split'),
-          loading: () => const Text('Split'),
-          error: (_, _) => const Text('Split'),
+          data: (details) => Text(details?.name ?? l10n.tr('Split')),
+          loading: () => Text(l10n.tr('Split')),
+          error: (_, _) => Text(l10n.tr('Split')),
         ),
         actions: [
           IconButton(
             key: const Key('split_detail_edit'),
-            tooltip: 'Edit split',
+            tooltip: l10n.tr('Edit split'),
             onPressed: _isDeleting
                 ? null
                 : () => context.push('/splits/${widget.splitId}/edit'),
@@ -42,7 +43,7 @@ class _SplitDetailScreenState extends ConsumerState<SplitDetailScreen> {
           ),
           IconButton(
             key: const Key('split_detail_delete'),
-            tooltip: 'Delete split',
+            tooltip: l10n.tr('Delete split'),
             onPressed: _isDeleting ? null : _confirmDelete,
             icon: const Icon(Icons.delete_outline),
           ),
@@ -51,7 +52,7 @@ class _SplitDetailScreenState extends ConsumerState<SplitDetailScreen> {
       body: detailsState.when(
         data: (details) {
           if (details == null) {
-            return const Center(child: Text('Split not found.'));
+            return Center(child: Text(l10n.tr('Split not found.')));
           }
           return _SplitDetailBody(details: details);
         },
@@ -59,7 +60,11 @@ class _SplitDetailScreenState extends ConsumerState<SplitDetailScreen> {
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('Failed to load split details: $error'),
+            child: Text(
+              l10n.format('Failed to load split details: {error}', {
+                'error': error,
+              }),
+            ),
           ),
         ),
       ),
@@ -67,18 +72,19 @@ class _SplitDetailScreenState extends ConsumerState<SplitDetailScreen> {
   }
 
   Future<void> _confirmDelete() async {
+    final l10n = context.l10n;
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        content: const Text('Do you want to delete this split?'),
+        content: Text(l10n.tr('Do you want to delete this split?')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(l10n.tr('Delete')),
           ),
         ],
       ),
@@ -99,15 +105,19 @@ class _SplitDetailScreenState extends ConsumerState<SplitDetailScreen> {
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Split deleted.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.tr('Split deleted.'))));
       context.go('/splits');
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not delete split: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.format('Could not delete split: {error}', {'error': error}),
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isDeleting = false);
@@ -123,6 +133,7 @@ class _SplitDetailBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final updatedAt = DateTime.fromMillisecondsSinceEpoch(details.updatedAt);
     final exercisesState = ref.watch(exercisesProvider);
     return ListView(
@@ -140,10 +151,14 @@ class _SplitDetailBody extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Updated ${DateFormat('yyyy-MM-dd HH:mm').format(updatedAt)}',
+                  l10n.format('Updated {value}', {
+                    'value': l10n.formatDateTimeCompact(updatedAt),
+                  }),
                 ),
                 const SizedBox(height: 6),
-                Text('Days: ${details.days.length}'),
+                Text(
+                  l10n.format('Days: {count}', {'count': details.days.length}),
+                ),
               ],
             ),
           ),
@@ -153,32 +168,36 @@ class _SplitDetailBody extends ConsumerWidget {
           data: (exercises) => SplitDetailMuscleVolumeCard(
             summary: _buildMuscleVolumeSummary(exercises),
           ),
-          loading: () => const Card(
-            key: Key('split_detail_volume_overview'),
+          loading: () => Card(
+            key: const Key('split_detail_volume_overview'),
             child: Padding(
-              padding: EdgeInsets.all(12),
-              child: Text('Loading volume by muscle...'),
+              padding: const EdgeInsets.all(12),
+              child: Text(l10n.tr('Loading volume by muscle...')),
             ),
           ),
           error: (error, _) => Card(
             key: const Key('split_detail_volume_overview'),
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Text('Could not load volume by muscle: $error'),
+              child: Text(
+                l10n.format('Could not load volume by muscle: {error}', {
+                  'error': error,
+                }),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 14),
-        const Text(
-          'Days',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        Text(
+          l10n.tr('Days'),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         if (details.days.isEmpty)
-          const Card(
+          Card(
             child: Padding(
-              padding: EdgeInsets.all(14),
-              child: Text('This split has no days configured.'),
+              padding: const EdgeInsets.all(14),
+              child: Text(l10n.tr('This split has no days configured.')),
             ),
           ),
         ...details.days.map((day) => _DayDetailsCard(day: day)),
@@ -226,6 +245,7 @@ class _DayDetailsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -234,19 +254,30 @@ class _DayDetailsCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Day ${day.dayIndex}: ${day.title}',
+              l10n.format('Day {day}: {title}', {
+                'day': day.dayIndex,
+                'title': day.title,
+              }),
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
             if (day.plannedExercises.isEmpty)
-              const Text('No planned exercises.')
+              Text(l10n.tr('No planned exercises.'))
             else
               ...day.plannedExercises.map(
                 (planned) => Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(
-                    '${planned.orderIndex}. ${planned.exerciseName} - '
-                    '${planned.targetSets} sets x ${planned.repMin}-${planned.repMax} reps',
+                    l10n.format(
+                      '{order}. {name} - {sets} sets x {repMin}-{repMax} reps',
+                      {
+                        'order': planned.orderIndex,
+                        'name': l10n.localizeExerciseName(planned.exerciseName),
+                        'sets': planned.targetSets,
+                        'repMin': planned.repMin,
+                        'repMax': planned.repMax,
+                      },
+                    ),
                   ),
                 ),
               ),

@@ -6,6 +6,8 @@ import 'package:training_log_app/core/models/exercise_with_labels.dart';
 import 'package:training_log_app/core/state/providers.dart';
 import 'package:training_log_app/features/exercises/exercise_list_screen.dart';
 
+import '../test_helpers/localized_test_app.dart';
+
 void main() {
   testWidgets('shows search and add controls without history icon button', (
     tester,
@@ -424,7 +426,9 @@ Future<void> _pumpExerciseList(
           (ref) => Stream.value(logCountMap),
         ),
       ],
-      child: const MaterialApp(home: Scaffold(body: ExerciseListContent())),
+      child: localizedTestApp(
+        home: const Scaffold(body: ExerciseListContent()),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -436,7 +440,7 @@ Future<void> _pumpExerciseSelectionScreen(
   String? selectedExerciseId,
 }) async {
   await tester.pumpWidget(
-    MaterialApp(
+    localizedTestApp(
       home: ExerciseSelectionScreen(
         exercises: exercises,
         selectedExerciseId: selectedExerciseId,

@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/models/exercise_with_labels.dart';
 import '../../core/models/logged_set_input.dart';
 import '../../core/state/providers.dart';
 import '../../core/time/app_clock.dart';
+import '../../l10n/app_localizations.dart';
 import '../exercises/exercise_list_screen.dart';
 import '../splits/split_repository.dart';
 import 'quick_workout_repository.dart';
@@ -92,6 +92,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     if (_isInitializingDraft) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -99,8 +100,14 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     if (widget.mode != WorkoutSessionMode.splitDay &&
         widget.mode != WorkoutSessionMode.free) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Workout')),
-        body: Center(child: Text('Unsupported workout mode: ${widget.mode}')),
+        appBar: AppBar(title: Text(l10n.tr('Workout'))),
+        body: Center(
+          child: Text(
+            l10n.format('Unsupported workout mode: {mode}', {
+              'mode': widget.mode,
+            }),
+          ),
+        ),
       );
     }
 
@@ -109,8 +116,10 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
       final dayIndex = widget.dayIndex;
       if (splitId == null || dayIndex == null || dayIndex <= 0) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Workout')),
-          body: const Center(child: Text('Missing split workout parameters.')),
+          appBar: AppBar(title: Text(l10n.tr('Workout'))),
+          body: Center(
+            child: Text(l10n.tr('Missing split workout parameters.')),
+          ),
         );
       }
 
@@ -120,8 +129,8 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
         data: (details) {
           if (details == null) {
             return Scaffold(
-              appBar: AppBar(title: const Text('Workout')),
-              body: const Center(child: Text('Split not found.')),
+              appBar: AppBar(title: Text(l10n.tr('Workout'))),
+              body: Center(child: Text(l10n.tr('Split not found.'))),
             );
           }
           final day = details.days
@@ -129,8 +138,8 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
               .firstOrNull;
           if (day == null) {
             return Scaffold(
-              appBar: AppBar(title: const Text('Workout')),
-              body: const Center(child: Text('Workout day not found.')),
+              appBar: AppBar(title: Text(l10n.tr('Workout'))),
+              body: Center(child: Text(l10n.tr('Workout day not found.'))),
             );
           }
 
@@ -150,15 +159,21 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
         loading: () =>
             const Scaffold(body: Center(child: CircularProgressIndicator())),
         error: (error, _) => Scaffold(
-          appBar: AppBar(title: const Text('Workout')),
-          body: Center(child: Text('Failed to load split workout: $error')),
+          appBar: AppBar(title: Text(l10n.tr('Workout'))),
+          body: Center(
+            child: Text(
+              l10n.format('Failed to load split workout: {error}', {
+                'error': error,
+              }),
+            ),
+          ),
         ),
       );
     }
 
     return _buildScaffold(
-      title: 'Free workout',
-      subtitle: 'Build as you go',
+      title: l10n.tr('Free workout'),
+      subtitle: l10n.tr('Build as you go'),
       splitDetails: null,
     );
   }
@@ -298,6 +313,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     required String subtitle,
     required SplitDetails? splitDetails,
   }) {
+    final l10n = context.l10n;
     final orderedExerciseIds = _exercises
         .map((exercise) => exercise.exerciseId)
         .toList(growable: false);
@@ -347,7 +363,9 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                 padding: const EdgeInsets.only(right: 6),
                 child: Chip(
                   label: Text(
-                    'Rest ${_formatRestTime(_restSecondsRemaining!)}',
+                    l10n.format('Rest {value}', {
+                      'value': _formatRestTime(_restSecondsRemaining!),
+                    }),
                   ),
                 ),
               ),
@@ -355,7 +373,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                 widget.mode == WorkoutSessionMode.free)
               IconButton(
                 key: const Key('workout_logger_delete_log'),
-                tooltip: 'Delete current log',
+                tooltip: l10n.tr('Delete current log'),
                 onPressed: _isSaving ? null : _deleteCurrentLog,
                 icon: const Icon(Icons.delete_outline),
               ),
@@ -369,7 +387,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                         width: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Finish'),
+                    : Text(l10n.tr('Finish')),
               ),
             ),
           ],
@@ -383,8 +401,10 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     widget.mode == WorkoutSessionMode.free
-                        ? 'No exercises yet. Add one to start logging sets.'
-                        : 'No planned exercises for this day.',
+                        ? l10n.tr(
+                            'No exercises yet. Add one to start logging sets.',
+                          )
+                        : l10n.tr('No planned exercises for this day.'),
                   ),
                 ),
               ),
@@ -421,7 +441,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                     key: const Key('workout_logger_add_exercise'),
                     onPressed: _handleAddExercise,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add exercise'),
+                    label: Text(l10n.tr('Add exercise')),
                   ),
                 ],
               ),
@@ -499,6 +519,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
   }
 
   Future<void> _editPrescription(int exerciseIndex) async {
+    final l10n = context.l10n;
     final exercise = _exercises[exerciseIndex];
     final setsController = TextEditingController(
       text: '${exercise.targetSets}',
@@ -515,37 +536,41 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     final shouldSave = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Edit ${exercise.exerciseName}'),
+        title: Text(
+          l10n.format('Edit {name}', {
+            'name': l10n.localizeExerciseName(exercise.exerciseName),
+          }),
+        ),
         content: SingleChildScrollView(
           child: Column(
             children: [
               _NumericField(
                 controller: setsController,
-                label: 'Target sets',
+                label: l10n.tr('Target sets'),
                 decimal: false,
               ),
               const SizedBox(height: 8),
               _NumericField(
                 controller: repMinController,
-                label: 'Rep min',
+                label: l10n.tr('Rep min'),
                 decimal: false,
               ),
               const SizedBox(height: 8),
               _NumericField(
                 controller: repMaxController,
-                label: 'Rep max',
+                label: l10n.tr('Rep max'),
                 decimal: false,
               ),
               const SizedBox(height: 8),
               _NumericField(
                 controller: restController,
-                label: 'Rest sec',
+                label: l10n.tr('Rest sec'),
                 decimal: false,
               ),
               const SizedBox(height: 8),
               _NumericField(
                 controller: rpeController,
-                label: 'Target RPE',
+                label: l10n.tr('Target RPE'),
                 decimal: true,
               ),
             ],
@@ -554,11 +579,11 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Save'),
+            child: Text(l10n.tr('Save')),
           ),
         ],
       ),
@@ -590,23 +615,23 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     rpeController.dispose();
 
     if (targetSets == null || targetSets <= 0) {
-      _showMessage('Target sets must be greater than zero.');
+      _showMessage(l10n.tr('Target sets must be greater than zero.'));
       return;
     }
     if (repMin == null || repMin <= 0) {
-      _showMessage('Rep min must be greater than zero.');
+      _showMessage(l10n.tr('Rep min must be greater than zero.'));
       return;
     }
     if (repMax == null || repMax < repMin) {
-      _showMessage('Rep max cannot be lower than rep min.');
+      _showMessage(l10n.tr('Rep max cannot be lower than rep min.'));
       return;
     }
     if (rest != null && rest < 0) {
-      _showMessage('Rest cannot be negative.');
+      _showMessage(l10n.tr('Rest cannot be negative.'));
       return;
     }
     if (rpe != null && (rpe < 0 || rpe > 10)) {
-      _showMessage('Target RPE must be between 0 and 10.');
+      _showMessage(l10n.tr('Target RPE must be between 0 and 10.'));
       return;
     }
 
@@ -649,9 +674,10 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
   }
 
   Future<void> _deleteLastSet(int exerciseIndex) async {
+    final l10n = context.l10n;
     final exercise = _exercises[exerciseIndex];
     if (exercise.rows.length <= 1) {
-      _showMessage('At least one set is required.');
+      _showMessage(l10n.tr('At least one set is required.'));
       return;
     }
 
@@ -660,18 +686,20 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
       final shouldDelete = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Delete last set?'),
-          content: const Text(
-            'The last set is already logged. Do you really want to delete it?',
+          title: Text(l10n.tr('Delete last set?')),
+          content: Text(
+            l10n.tr(
+              'The last set is already logged. Do you really want to delete it?',
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(l10n.tr('Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete'),
+              child: Text(l10n.tr('Delete')),
             ),
           ],
         ),
@@ -720,6 +748,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
   }
 
   Future<void> _onFinish(SplitDetails? splitDetails) async {
+    final l10n = context.l10n;
     final sessionData = _buildSessionPayload();
     if (sessionData == null) {
       return;
@@ -743,7 +772,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                 .where((day) => day.dayIndex == widget.dayIndex)
                 .firstOrNull
                 ?.title
-          : 'Free workout';
+          : l10n.tr('Free workout');
 
       await ref
           .read(quickWorkoutRepositoryProvider)
@@ -770,15 +799,19 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Workout saved.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.tr('Workout saved.'))),
+      );
       context.go('/home');
     } catch (error) {
       if (!mounted) {
         return;
       }
-      _showMessage('Could not save workout: $error');
+      _showMessage(
+        context.l10n.format('Could not save workout: {error}', {
+          'error': error,
+        }),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -787,6 +820,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
   }
 
   _SessionPayload? _buildSessionPayload() {
+    final l10n = context.l10n;
     final logs = <WorkoutExerciseLogInput>[];
     var totalSets = 0;
     var unfilledSets = 0;
@@ -829,7 +863,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     }
 
     if (logs.isEmpty || totalSets == 0) {
-      _showMessage('Log at least one complete set before finishing.');
+      _showMessage(l10n.tr('Log at least one complete set before finishing.'));
       return null;
     }
     return _SessionPayload(
@@ -840,6 +874,7 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
   }
 
   Future<bool?> _showFinishSheet(_SessionPayload sessionData) {
+    final l10n = context.l10n;
     return showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -851,16 +886,23 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Finish workout',
+                l10n.tr('Finish workout'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 10),
-              Text('${sessionData.logs.length} exercises'),
-              Text('${sessionData.totalSets} total sets'),
+              Text(l10n.exerciseCountLabel(sessionData.logs.length)),
+              Text(
+                l10n.format('{count} total sets', {
+                  'count': sessionData.totalSets,
+                }),
+              ),
               if (sessionData.unfilledSetCount > 0) ...[
                 const SizedBox(height: 10),
                 Text(
-                  '${sessionData.unfilledSetCount} unfilled sets will not be counted. Save anyway?',
+                  l10n.format(
+                    '{count} unfilled sets will not be counted. Save anyway?',
+                    {'count': sessionData.unfilledSetCount},
+                  ),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.tertiary,
                     fontWeight: FontWeight.w600,
@@ -872,12 +914,12 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
+                    child: Text(l10n.tr('Cancel')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Save'),
+                    child: Text(l10n.tr('Save')),
                   ),
                 ],
               ),
@@ -901,21 +943,24 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
   }
 
   Future<void> _deleteCurrentLog() async {
+    final l10n = context.l10n;
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete current log?'),
-        content: const Text(
-          'This will clear your in-progress workout. You can start again from Home.',
+        title: Text(l10n.tr('Delete current log?')),
+        content: Text(
+          l10n.tr(
+            'This will clear your in-progress workout. You can start again from Home.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(l10n.tr('Delete')),
           ),
         ],
       ),
@@ -931,9 +976,9 @@ class _WorkoutLoggerScreenState extends ConsumerState<WorkoutLoggerScreen>
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('In-progress log deleted.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.tr('In-progress log deleted.'))),
+    );
     context.go('/home');
   }
 
@@ -1051,6 +1096,7 @@ class _ExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final occurrenceReference = references.occurrenceFor(
       exerciseId: exercise.exerciseId,
       occurrenceIndex: occurrenceIndex,
@@ -1067,13 +1113,13 @@ class _ExerciseCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    exercise.exerciseName,
+                    l10n.localizeExerciseName(exercise.exerciseName),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
                 if (onSwap != null)
                   IconButton(
-                    tooltip: 'Swap exercise',
+                    tooltip: l10n.tr('Swap exercise'),
                     onPressed: onSwap,
                     icon: const Icon(Icons.swap_horiz),
                   ),
@@ -1086,14 +1132,14 @@ class _ExerciseCard extends StatelessWidget {
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem<String>(
+                    PopupMenuItem<String>(
                       value: 'edit',
-                      child: Text('Edit prescription'),
+                      child: Text(l10n.tr('Edit prescription')),
                     ),
                     if (onRemove != null)
-                      const PopupMenuItem<String>(
+                      PopupMenuItem<String>(
                         value: 'remove',
-                        child: Text('Remove exercise'),
+                        child: Text(l10n.tr('Remove exercise')),
                       ),
                   ],
                 ),
@@ -1105,21 +1151,22 @@ class _ExerciseCard extends StatelessWidget {
                 runSpacing: 6,
                 children: exercise.labels
                     .take(4)
-                    .map((label) => Chip(label: Text(label)))
+                    .map(
+                      (label) =>
+                          Chip(label: Text(l10n.localizeLabelName(label))),
+                    )
                     .toList(growable: false),
               ),
             const SizedBox(height: 8),
             Text(
-              '${exercise.targetSets} sets • ${exercise.repMin}-${exercise.repMax} reps'
-              '${exercise.restSeconds == null ? '' : ' • ${exercise.restSeconds}s rest'}'
-              '${exercise.targetRpe == null ? '' : ' • RPE ${exercise.targetRpe}'}',
+              _prescriptionSummary(context, exercise),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             if (occurrenceReference != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  _formatReferenceSummary(occurrenceReference.session),
+                  _formatReferenceSummary(context, occurrenceReference.session),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               )
@@ -1127,7 +1174,7 @@ class _ExerciseCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'Loading last workout...',
+                  l10n.tr('Loading last workout...'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -1155,7 +1202,7 @@ class _ExerciseCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onAddSet,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add set'),
+                    label: Text(l10n.tr('Add set')),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1163,7 +1210,7 @@ class _ExerciseCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onDeleteSet,
                     icon: const Icon(Icons.delete_outline),
-                    label: const Text('Delete set'),
+                    label: Text(l10n.tr('Delete set')),
                   ),
                 ),
               ],
@@ -1172,13 +1219,13 @@ class _ExerciseCard extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onStartRestTimer,
               icon: const Icon(Icons.timer_outlined),
-              label: const Text('Start rest timer'),
+              label: Text(l10n.tr('Start rest timer')),
             ),
             if (showProgressHint)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'Next time +2.5 kg',
+                  l10n.tr('Next time +2.5 kg'),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w600,
@@ -1189,6 +1236,39 @@ class _ExerciseCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _prescriptionSummary(
+    BuildContext context,
+    _WorkoutExerciseState exercise,
+  ) {
+    final l10n = context.l10n;
+    final params = <String, Object?>{
+      'sets': exercise.targetSets,
+      'repMin': exercise.repMin,
+      'repMax': exercise.repMax,
+      'rest': exercise.restSeconds,
+      'rpe': exercise.targetRpe,
+    };
+    if (exercise.restSeconds != null && exercise.targetRpe != null) {
+      return l10n.format(
+        '{sets} sets | {repMin}-{repMax} reps | {rest}s rest | RPE {rpe}',
+        params,
+      );
+    }
+    if (exercise.restSeconds != null) {
+      return l10n.format(
+        '{sets} sets | {repMin}-{repMax} reps | {rest}s rest',
+        params,
+      );
+    }
+    if (exercise.targetRpe != null) {
+      return l10n.format(
+        '{sets} sets | {repMin}-{repMax} reps | RPE {rpe}',
+        params,
+      );
+    }
+    return l10n.format('{sets} sets | {repMin}-{repMax} reps', params);
   }
 
   bool _shouldShowProgressHint(_WorkoutExerciseState exercise) {
@@ -1206,15 +1286,22 @@ class _ExerciseCard extends StatelessWidget {
     return true;
   }
 
-  String _formatReferenceSummary(WorkoutLoggerReferenceSession session) {
-    final sessionDate = DateFormat(
-      'MMM d, yyyy',
-    ).format(DateTime.fromMillisecondsSinceEpoch(session.startedAt));
+  String _formatReferenceSummary(
+    BuildContext context,
+    WorkoutLoggerReferenceSession session,
+  ) {
+    final l10n = context.l10n;
+    final sessionDate = l10n.formatDateLong(
+      DateTime.fromMillisecondsSinceEpoch(session.startedAt),
+    );
     final sessionLabel = session.sessionName?.trim();
     if (sessionLabel == null || sessionLabel.isEmpty) {
-      return 'Reference: $sessionDate';
+      return l10n.format('Reference: {date}', {'date': sessionDate});
     }
-    return 'Reference: $sessionLabel · $sessionDate';
+    return l10n.format('Reference: {label} | {date}', {
+      'label': sessionLabel,
+      'date': sessionDate,
+    });
   }
 }
 
@@ -1235,9 +1322,10 @@ class _SetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final reps = row.repsValue;
     final belowRangeHint = row.isLoggedSet && reps != null && reps < repMin;
-    final referenceHint = _buildReferenceHint();
+    final referenceHint = _buildReferenceHint(context);
     final deltaHint = _buildDeltaHint(context);
 
     return Padding(
@@ -1257,7 +1345,7 @@ class _SetRow extends StatelessWidget {
               Expanded(
                 child: _NumericField(
                   controller: row.weightController,
-                  label: 'Weight',
+                  label: l10n.tr('Weight'),
                   decimal: true,
                 ),
               ),
@@ -1265,7 +1353,7 @@ class _SetRow extends StatelessWidget {
               Expanded(
                 child: _NumericField(
                   controller: row.repsController,
-                  label: 'Reps',
+                  label: l10n.tr('Reps'),
                   decimal: false,
                 ),
               ),
@@ -1279,7 +1367,7 @@ class _SetRow extends StatelessWidget {
               ),
               if (onCopyPrevious != null)
                 IconButton(
-                  tooltip: 'Copy previous set',
+                  tooltip: l10n.tr('Copy previous set'),
                   onPressed: onCopyPrevious,
                   icon: const Icon(Icons.content_copy_outlined),
                 ),
@@ -1306,7 +1394,7 @@ class _SetRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(left: 4, top: 2),
               child: Text(
-                'Below target range - consider -2.5 kg or more rest.',
+                l10n.tr('Below target range - consider -2.5 kg or more rest.'),
                 style: TextStyle(color: Theme.of(context).colorScheme.tertiary),
               ),
             ),
@@ -1315,18 +1403,27 @@ class _SetRow extends StatelessWidget {
     );
   }
 
-  String _buildReferenceHint() {
+  String _buildReferenceHint(BuildContext context) {
     final set = referenceSet;
     if (set == null) {
-      return 'Last: -';
+      return context.l10n.tr('Last: -');
     }
-    final rpeSuffix = set.rpe == null
-        ? ''
-        : ' · RPE ${set.rpe!.toStringAsFixed(1)}';
-    return 'Last: ${set.weightKg.toStringAsFixed(1)} x ${set.reps}$rpeSuffix';
+    final weight = set.weightKg.toStringAsFixed(1);
+    if (set.rpe == null) {
+      return context.l10n.format('Last: {weight} x {reps}', {
+        'weight': weight,
+        'reps': set.reps,
+      });
+    }
+    return context.l10n.format('Last: {weight} x {reps} | RPE {rpe}', {
+      'weight': weight,
+      'reps': set.reps,
+      'rpe': set.rpe!.toStringAsFixed(1),
+    });
   }
 
   _SetDeltaHint? _buildDeltaHint(BuildContext context) {
+    final l10n = context.l10n;
     final set = referenceSet;
     if (set == null || !row.isLoggedSet) {
       return null;
@@ -1343,7 +1440,7 @@ class _SetRow extends StatelessWidget {
     final roundedDelta = double.parse(delta.toStringAsFixed(1));
     if (roundedDelta == 0) {
       return _SetDeltaHint(
-        text: 'Vs last: matched',
+        text: l10n.tr('Vs last: matched'),
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       );
     }
@@ -1352,7 +1449,9 @@ class _SetRow extends StatelessWidget {
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).colorScheme.tertiary;
     return _SetDeltaHint(
-      text: 'Vs last: $sign$roundedDelta volume',
+      text: l10n.format('Vs last: {delta} volume', {
+        'delta': '$sign$roundedDelta',
+      }),
       color: color,
     );
   }
@@ -1416,12 +1515,18 @@ class _WorkoutExercisePickerScreen extends ConsumerWidget {
         );
       },
       loading: () => Scaffold(
-        appBar: AppBar(title: const Text('Choose exercise')),
+        appBar: AppBar(title: Text(context.l10n.tr('Choose exercise'))),
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (error, _) => Scaffold(
-        appBar: AppBar(title: const Text('Choose exercise')),
-        body: Center(child: Text('Failed to load exercises: $error')),
+        appBar: AppBar(title: Text(context.l10n.tr('Choose exercise'))),
+        body: Center(
+          child: Text(
+            context.l10n.format('Failed to load exercises: {error}', {
+              'error': error,
+            }),
+          ),
+        ),
       ),
     );
   }

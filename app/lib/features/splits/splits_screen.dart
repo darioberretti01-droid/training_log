@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/state/providers.dart';
+import '../../l10n/app_localizations.dart';
 import 'split_repository.dart';
 
 class SplitsScreen extends ConsumerWidget {
@@ -11,6 +11,7 @@ class SplitsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final splitsState = ref.watch(splitsProvider);
     final splitBuilderDraftState = ref.watch(
       persistedSplitBuilderDraftProvider,
@@ -37,18 +38,20 @@ class SplitsScreen extends ConsumerWidget {
               final shouldContinue = await showDialog<bool>(
                 context: context,
                 builder: (dialogContext) => AlertDialog(
-                  title: const Text('Saved split draft found'),
-                  content: const Text(
-                    'There is already a saved split draft. If you continue, you will overwrite it and the draft will be lost. Do you want to continue?',
+                  title: Text(l10n.tr('Saved split draft found')),
+                  content: Text(
+                    l10n.tr(
+                      'There is already a saved split draft. If you continue, you will overwrite it and the draft will be lost. Do you want to continue?',
+                    ),
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(dialogContext).pop(false),
-                      child: const Text('Cancel'),
+                      child: Text(l10n.tr('Cancel')),
                     ),
                     FilledButton(
                       onPressed: () => Navigator.of(dialogContext).pop(true),
-                      child: const Text('Continue'),
+                      child: Text(l10n.tr('Continue')),
                     ),
                   ],
                 ),
@@ -72,7 +75,9 @@ class SplitsScreen extends ConsumerWidget {
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _SplitsErrorState(
-          message: 'Failed to load splits: $error',
+          message: l10n.format('Failed to load splits: {error}', {
+            'error': error,
+          }),
           onRetry: () => ref.invalidate(splitsProvider),
         ),
       ),
@@ -95,6 +100,7 @@ class _SplitsContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final actionColor = Theme.of(context).colorScheme.primary;
     SplitSummary? activeSplit;
     for (final split in splits) {
@@ -115,28 +121,31 @@ class _SplitsContent extends StatelessWidget {
               key: const Key('splits_add_button'),
               onPressed: onAddSplit,
               avatar: Icon(Icons.add, size: 18, color: actionColor),
-              label: Text('ADD SPLIT', style: TextStyle(color: actionColor)),
+              label: Text(
+                l10n.tr('ADD SPLIT'),
+                style: TextStyle(color: actionColor),
+              ),
             ),
             if (hasSavedSplitDraft)
               OutlinedButton.icon(
                 key: const Key('splits_continue_building_split_button'),
                 onPressed: onContinueSplitDraft,
                 icon: const Icon(Icons.play_arrow_outlined),
-                label: const Text('Continue building split'),
+                label: Text(l10n.tr('Continue building split')),
               ),
           ],
         ),
         const SizedBox(height: 20),
-        const Text(
-          'Current split',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        Text(
+          l10n.tr('Current split'),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         _CurrentSplitCard(split: activeSplit),
         const SizedBox(height: 20),
-        const Text(
-          'All splits',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        Text(
+          l10n.tr('All splits'),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         if (splits.isEmpty)
@@ -144,7 +153,9 @@ class _SplitsContent extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Text(
-                'No splits created yet. Tap ADD SPLIT to create your first split.',
+                l10n.tr(
+                  'No splits created yet. Tap ADD SPLIT to create your first split.',
+                ),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
@@ -168,7 +179,7 @@ class _CurrentSplitCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: split == null
-            ? const Text('No active split selected.')
+            ? Text(context.l10n.tr('No active split selected.'))
             : ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(
@@ -176,7 +187,7 @@ class _CurrentSplitCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 subtitle: Text(
-                  _splitStatsLabel(split!.dayCount, split!.totalSets),
+                  _splitStatsLabel(context, split!.dayCount, split!.totalSets),
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/splits/${split!.id}'),
@@ -200,6 +211,7 @@ class _SplitListCardState extends ConsumerState<_SplitListCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final split = widget.split;
     return Card(
       child: Column(
@@ -207,13 +219,15 @@ class _SplitListCardState extends ConsumerState<_SplitListCard> {
         children: [
           ListTile(
             title: Text(split.name),
-            subtitle: Text(_splitStatsLabel(split.dayCount, split.totalSets)),
+            subtitle: Text(
+              _splitStatsLabel(context, split.dayCount, split.totalSets),
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (split.isActive)
-                  const Chip(
-                    label: Text('Active'),
+                  Chip(
+                    label: Text(l10n.tr('Active')),
                     visualDensity: VisualDensity.compact,
                   ),
                 IconButton(
@@ -221,8 +235,8 @@ class _SplitListCardState extends ConsumerState<_SplitListCard> {
                     _isExpanded ? Icons.expand_less : Icons.expand_more,
                   ),
                   tooltip: _isExpanded
-                      ? 'Hide split summary'
-                      : 'Show split summary',
+                      ? l10n.tr('Hide split summary')
+                      : l10n.tr('Show split summary'),
                   onPressed: () => setState(() => _isExpanded = !_isExpanded),
                 ),
                 const Icon(Icons.chevron_right),
@@ -248,18 +262,21 @@ class _SplitDisclosureContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final detailsState = ref.watch(splitDetailsProvider(split.id));
     return detailsState.when(
       data: (details) {
         if (details == null) {
           return Text(
-            'Split details unavailable.\nLast logged: ${_lastLoggedLabel(split.lastLoggedAt)}',
+            l10n.format('Split details unavailable.\nLast logged: {value}', {
+              'value': _lastLoggedLabel(context, split.lastLoggedAt),
+            }),
           );
         }
 
         final rows = <Widget>[];
         if (details.days.isEmpty) {
-          rows.add(const Text('No day plans configured.'));
+          rows.add(Text(l10n.tr('No day plans configured.')));
         } else {
           for (var dayIndex = 0; dayIndex < details.days.length; dayIndex++) {
             final day = details.days[dayIndex];
@@ -269,7 +286,7 @@ class _SplitDisclosureContent extends ConsumerWidget {
             );
             rows.add(
               Text(
-                '${day.title}: ${_setCountLabel(daySetTotal)}',
+                '${day.title}: ${l10n.setCountLabel(daySetTotal)}',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             );
@@ -278,7 +295,7 @@ class _SplitDisclosureContent extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(left: 16, top: 2),
                   child: Text(
-                    '${exercise.exerciseName}: ${_setCountLabel(exercise.targetSets)}',
+                    '${l10n.localizeExerciseName(exercise.exerciseName)}: ${l10n.setCountLabel(exercise.targetSets)}',
                   ),
                 ),
               );
@@ -292,7 +309,9 @@ class _SplitDisclosureContent extends ConsumerWidget {
         rows.add(const SizedBox(height: 10));
         rows.add(
           Text(
-            'Last logged: ${_lastLoggedLabel(split.lastLoggedAt)}',
+            l10n.format('Last logged: {value}', {
+              'value': _lastLoggedLabel(context, split.lastLoggedAt),
+            }),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         );
@@ -307,7 +326,9 @@ class _SplitDisclosureContent extends ConsumerWidget {
         child: LinearProgressIndicator(minHeight: 2),
       ),
       error: (error, stackTrace) => Text(
-        'Could not load split summary.\nLast logged: ${_lastLoggedLabel(split.lastLoggedAt)}',
+        l10n.format('Could not load split summary.\nLast logged: {value}', {
+          'value': _lastLoggedLabel(context, split.lastLoggedAt),
+        }),
       ),
     );
   }
@@ -329,7 +350,10 @@ class _SplitsErrorState extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            FilledButton(
+              onPressed: onRetry,
+              child: Text(context.l10n.tr('Retry')),
+            ),
           ],
         ),
       ),
@@ -337,29 +361,16 @@ class _SplitsErrorState extends StatelessWidget {
   }
 }
 
-String _dayCountLabel(int dayCount) {
-  if (dayCount == 1) {
-    return '1 day';
-  }
-  return '$dayCount days';
+String _splitStatsLabel(BuildContext context, int dayCount, int totalSets) {
+  final l10n = context.l10n;
+  return '${l10n.dayCountLabel(dayCount)} | ${l10n.setCountLabel(totalSets)}';
 }
 
-String _setCountLabel(int setCount) {
-  if (setCount == 1) {
-    return '1 set';
-  }
-  return '$setCount sets';
-}
-
-String _splitStatsLabel(int dayCount, int totalSets) {
-  return '${_dayCountLabel(dayCount)} | ${_setCountLabel(totalSets)}';
-}
-
-String _lastLoggedLabel(int? lastLoggedAtMs) {
+String _lastLoggedLabel(BuildContext context, int? lastLoggedAtMs) {
   if (lastLoggedAtMs == null) {
-    return 'Never';
+    return context.l10n.tr('Never');
   }
-  return DateFormat('yyyy-MM-dd HH:mm').format(
+  return context.l10n.formatDateTimeCompact(
     DateTime.fromMillisecondsSinceEpoch(lastLoggedAtMs),
   );
 }

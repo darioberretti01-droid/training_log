@@ -287,6 +287,53 @@ void main() {
     );
   });
 
+  testWidgets('other tab can switch app language to Italian', (tester) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (count, error) => null,
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          seedDataProvider.overrideWith((ref) async {}),
+          exercisesProvider.overrideWith((ref) => Stream.value(const [])),
+          splitsProvider.overrideWith((ref) => Stream.value(_sampleSplits)),
+          recentHomeSessionsProvider.overrideWith((ref) async => const []),
+          lastHomeSessionProvider.overrideWith((ref) async => null),
+          lastSplitDaySessionProvider.overrideWith((ref) async => null),
+          suggestedWorkoutCardStateProvider.overrideWith((ref) async => null),
+          activeSplitDetailsProvider.overrideWith((ref) async => null),
+          activeSplitProvider.overrideWith(
+            (ref) => const AsyncValue.data(null),
+          ),
+        ],
+        child: const TrainingLogApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_horiz));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('other_language_item')), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Follow system language'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('other_language_item')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('language_option_it')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('Altro')),
+      findsOneWidget,
+    );
+    expect(find.text('Lingua'), findsOneWidget);
+    expect(find.text('Italiano'), findsWidgets);
+    expect(find.text('Etichette'), findsOneWidget);
+  });
+
   testWidgets('tapping split opens split details screen', (tester) async {
     final repository = _FakeSplitRepository()
       ..detailsById['split_1'] = const SplitDetails(

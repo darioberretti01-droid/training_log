@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/state/providers.dart';
+import '../../l10n/app_localizations.dart';
 import 'exercise_repository.dart';
 
 class LabelsScreen extends ConsumerStatefulWidget {
@@ -43,12 +44,13 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final seedState = ref.watch(seedDataProvider);
     final catalogState = ref.watch(labelCatalogProvider);
     final addActionColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Labels')),
+      appBar: AppBar(title: Text(l10n.tr('Labels'))),
       body: seedState.when(
         data: (_) => catalogState.when(
           data: (catalog) {
@@ -60,9 +62,9 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                   text: TextSpan(
                     style: Theme.of(context).textTheme.bodyMedium,
                     children: [
-                      const TextSpan(text: 'Create labels with '),
+                      TextSpan(text: l10n.tr('Create labels with ')),
                       TextSpan(
-                        text: 'ADD LABEL',
+                        text: l10n.tr('ADD LABEL'),
                         style: TextStyle(
                           color: addActionColor,
                           fontWeight: FontWeight.w600,
@@ -74,7 +76,7 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Only added labels can be deleted.',
+                  l10n.tr('Only added labels can be deleted.'),
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
@@ -84,8 +86,8 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                       child: TextField(
                         key: const Key('labels_search_field'),
                         controller: _searchController,
-                        decoration: const InputDecoration(
-                          labelText: 'Search labels',
+                        decoration: InputDecoration(
+                          labelText: l10n.tr('Search labels'),
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.search),
                         ),
@@ -98,7 +100,7 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                     ActionChip(
                       key: const Key('labels_add_button'),
                       label: Text(
-                        'ADD LABEL',
+                        l10n.tr('ADD LABEL'),
                         style: TextStyle(color: addActionColor),
                       ),
                       avatar: Icon(Icons.add, size: 18, color: addActionColor),
@@ -113,26 +115,30 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                   children: [
                     OutlinedButton.icon(
                       key: const Key('labels_undo_button'),
-                      onPressed:
-                          (_undoStack.isEmpty || _isMutating) ? null : _undoLast,
+                      onPressed: (_undoStack.isEmpty || _isMutating)
+                          ? null
+                          : _undoLast,
                       icon: const Icon(Icons.undo),
-                      label: const Text('Undo'),
+                      label: Text(l10n.tr('Undo')),
                     ),
                     OutlinedButton.icon(
                       key: const Key('labels_redo_button'),
-                      onPressed:
-                          (_redoStack.isEmpty || _isMutating) ? null : _redoLast,
+                      onPressed: (_redoStack.isEmpty || _isMutating)
+                          ? null
+                          : _redoLast,
                       icon: const Icon(Icons.redo),
-                      label: const Text('Redo'),
+                      label: Text(l10n.tr('Redo')),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 if (filtered.isEmpty)
-                  const Card(
+                  Card(
                     child: Padding(
-                      padding: EdgeInsets.all(14),
-                      child: Text('No labels match the current filter.'),
+                      padding: const EdgeInsets.all(14),
+                      child: Text(
+                        l10n.tr('No labels match the current filter.'),
+                      ),
                     ),
                   )
                 else
@@ -147,26 +153,44 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(child: Text('Failed to load labels: $error')),
+          error: (error, _) => Center(
+            child: Text(
+              l10n.format('Failed to load labels: {error}', {'error': error}),
+            ),
+          ),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('Failed to initialize labels: $error')),
+        error: (error, _) => Center(
+          child: Text(
+            l10n.format('Failed to initialize labels: {error}', {
+              'error': error,
+            }),
+          ),
+        ),
       ),
     );
   }
 
   List<LabelCatalogEntry> _filteredCatalog(List<LabelCatalogEntry> catalog) {
     final visible = catalog.where((entry) => !entry.isHidden);
-    final byQuery = visible.where((entry) => entry.name.contains(_query));
-    final output = byQuery.toList()..sort((a, b) => a.name.compareTo(b.name));
+    final l10n = context.l10n;
+    final byQuery = visible.where(
+      (entry) =>
+          l10n.localizeLabelName(entry.name).toLowerCase().contains(_query),
+    );
+    final output = byQuery.toList()
+      ..sort(
+        (a, b) => l10n
+            .localizeLabelName(a.name)
+            .compareTo(l10n.localizeLabelName(b.name)),
+      );
     return output;
   }
 
   Widget _buildLabelPill(BuildContext context, LabelCatalogEntry entry) {
     if (entry.isStandard) {
       return InputChip(
-        label: Text(entry.name),
+        label: Text(context.l10n.localizeLabelName(entry.name)),
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.compact,
         onPressed: _isMutating ? null : () {},
@@ -175,7 +199,7 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     }
 
     return InputChip(
-      label: Text(entry.name),
+      label: Text(context.l10n.localizeLabelName(entry.name)),
       onDeleted: _isMutating ? null : () => _confirmDeleteCustom(entry),
       deleteIcon: _DeleteCircleIcon(key: Key('label_remove_${entry.name}')),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -186,15 +210,16 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
   }
 
   Future<void> _openAddDialog() async {
+    final l10n = context.l10n;
     String input = '';
     final created = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Create Label'),
+        title: Text(l10n.tr('Create Label')),
         content: TextField(
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Label name',
+          decoration: InputDecoration(
+            labelText: l10n.tr('Label name'),
             border: OutlineInputBorder(),
           ),
           onChanged: (value) => input = value,
@@ -209,7 +234,7 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(l10n.tr('Cancel')),
           ),
           FilledButton(
             onPressed: () {
@@ -219,7 +244,7 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
               }
               Navigator.of(context).pop(normalized);
             },
-            child: const Text('Add'),
+            child: Text(l10n.tr('Add')),
           ),
         ],
       ),
@@ -231,9 +256,9 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
 
     setState(() => _isMutating = true);
     try {
-      final wasCreated = await ref.read(exerciseRepositoryProvider).createLabel(
-            created,
-          );
+      final wasCreated = await ref
+          .read(exerciseRepositoryProvider)
+          .createLabel(created);
       if (wasCreated) {
         _undoStack.add(_UndoOperation.addLabel(created));
         _redoStack.clear();
@@ -242,7 +267,9 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Label already exists or is standard.')),
+          SnackBar(
+            content: Text(l10n.tr('Label already exists or is standard.')),
+          ),
         );
       }
     } finally {
@@ -260,17 +287,19 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     final shouldProceed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        content: const Text(
-          'Are you sure to delete this label? When you exit the Labels screen, it will not be possible to restore it.',
+        content: Text(
+          context.l10n.tr(
+            'Are you sure to delete this label? When you exit the Labels screen, it will not be possible to restore it.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(context.l10n.tr('Delete')),
           ),
         ],
       ),
@@ -307,13 +336,17 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
       final repository = ref.read(exerciseRepositoryProvider);
       switch (operation.type) {
         case _UndoType.addLabel:
-          final deleted = await repository.deleteCustomLabel(operation.labelName);
+          final deleted = await repository.deleteCustomLabel(
+            operation.labelName,
+          );
           if (deleted != null) {
             _redoStack.add(operation);
           }
           break;
         case _UndoType.deleteCustom:
-          await repository.restoreDeletedCustomLabel(operation.deletedSnapshot!);
+          await repository.restoreDeletedCustomLabel(
+            operation.deletedSnapshot!,
+          );
           _redoStack.add(operation);
           break;
       }
@@ -341,7 +374,9 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
           }
           break;
         case _UndoType.deleteCustom:
-          final snapshot = await repository.deleteCustomLabel(operation.labelName);
+          final snapshot = await repository.deleteCustomLabel(
+            operation.labelName,
+          );
           if (snapshot != null) {
             _undoStack.add(_UndoOperation.deleteCustom(snapshot));
           }
@@ -363,9 +398,7 @@ class _DeleteCircleIcon extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: const SizedBox(
         width: 16,
