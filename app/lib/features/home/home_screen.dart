@@ -720,6 +720,8 @@ String _sessionDisplayName(HomeSessionOverviewEntry entry) {
   }
 }
 
+const _debugToolsPassword = 'DevAccess';
+
 class OtherTabContent extends ConsumerWidget {
   const OtherTabContent({super.key});
 
@@ -746,8 +748,49 @@ class OtherTabContent extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const _DebugToolsCard(),
+          Card(
+            child: ListTile(
+              key: const Key('other_debug_tools_item'),
+              title: const Text('Debug tools'),
+              subtitle: const Text('Protected developer utilities'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openDebugTools(context),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _openDebugTools(BuildContext context) async {
+    final unlocked = await _showDebugToolsPasswordPrompt(context);
+    if (!context.mounted || !unlocked) {
+      return;
+    }
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const DebugToolsScreen()));
+  }
+
+  Future<bool> _showDebugToolsPasswordPrompt(BuildContext context) async {
+    final unlocked = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => const _DebugToolsPasswordDialog(),
+    );
+    return unlocked ?? false;
+  }
+}
+
+class DebugToolsScreen extends StatelessWidget {
+  const DebugToolsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Debug tools')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: const [_DebugToolsCard()],
       ),
     );
   }
@@ -864,5 +907,64 @@ class _DebugToolsCardState extends ConsumerState<_DebugToolsCard> {
     ref.invalidate(persistedWorkoutDraftProvider);
     ref.invalidate(effectiveWorkoutDraftProvider);
     ref.invalidate(todayWorkoutDraftProvider);
+  }
+}
+
+class _DebugToolsPasswordDialog extends StatefulWidget {
+  const _DebugToolsPasswordDialog();
+
+  @override
+  State<_DebugToolsPasswordDialog> createState() =>
+      _DebugToolsPasswordDialogState();
+}
+
+class _DebugToolsPasswordDialogState extends State<_DebugToolsPasswordDialog> {
+  final TextEditingController _controller = TextEditingController();
+  String _errorText = '';
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Unlock debug tools'),
+      content: TextField(
+        key: const Key('debug_tools_password_field'),
+        controller: _controller,
+        autofocus: true,
+        obscureText: true,
+        decoration: InputDecoration(
+          labelText: 'Password',
+          errorText: _errorText.isEmpty ? null : _errorText,
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('debug_tools_password_submit'),
+          onPressed: _submit,
+          child: const Text('Unlock'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (_controller.text == _debugToolsPassword) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+
+    setState(() {
+      _errorText = 'Incorrect password';
+    });
   }
 }
