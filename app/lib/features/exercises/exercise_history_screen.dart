@@ -22,7 +22,7 @@ class ExerciseHistoryScreen extends ConsumerWidget {
       data: (exercise) {
         if (exercise == null) {
           return Scaffold(
-            appBar: AppBar(title: Text(l10n.tr('History'))),
+            appBar: _buildExerciseHistoryAppBar(),
             body: Center(child: Text(l10n.tr('Exercise not found.'))),
           );
         }
@@ -35,12 +35,8 @@ class ExerciseHistoryScreen extends ConsumerWidget {
         final sessionsState = ref.watch(recentSessionsByLookupProvider(lookup));
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              l10n.format('{name} History', {
-                'name': l10n.localizeExerciseName(exercise.name),
-              }),
-            ),
+          appBar: _buildExerciseHistoryAppBar(
+            title: l10n.localizeExerciseName(exercise.name),
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
@@ -113,13 +109,22 @@ class ExerciseHistoryScreen extends ConsumerWidget {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
-        appBar: AppBar(title: Text(l10n.tr('History'))),
+        appBar: _buildExerciseHistoryAppBar(),
         body: Center(
           child: Text(
             l10n.format('Failed to load exercise: {error}', {'error': error}),
           ),
         ),
       ),
+    );
+  }
+
+  PreferredSizeWidget _buildExerciseHistoryAppBar({String? title}) {
+    return AppBar(
+      toolbarHeight: title == null ? null : 72,
+      title: title == null
+          ? null
+          : Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
     );
   }
 }
@@ -138,13 +143,16 @@ class _LabelsSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            OverflowBar(
+              spacing: 8,
+              overflowSpacing: 8,
+              alignment: MainAxisAlignment.spaceBetween,
+              overflowAlignment: OverflowBarAlignment.end,
               children: [
                 Text(
                   l10n.tr('Labels'),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const Spacer(),
                 OutlinedButton.icon(
                   key: const Key('exercise_history_edit_labels'),
                   onPressed: () =>
