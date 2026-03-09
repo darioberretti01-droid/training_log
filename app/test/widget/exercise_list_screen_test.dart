@@ -47,6 +47,36 @@ void main() {
     expect(find.text('chest, push'), findsOneWidget);
   });
 
+  testWidgets('italian pill view keeps shortened label copy', (tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await _pumpExerciseList(
+      tester,
+      locale: const Locale('it'),
+      exercises: const [
+        ExerciseWithLabels(
+          id: 'bench_press',
+          name: 'Barbell Bench Press',
+          labels: ['chest', 'compound'],
+        ),
+        ExerciseWithLabels(
+          id: 'dips',
+          name: 'Dips',
+          labels: ['chest', 'compound'],
+        ),
+      ],
+    );
+
+    expect(find.text('Divisione'), findsOneWidget);
+    expect(find.textContaining('multiart.'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'split builder picker places view toggle to the right of division selector',
     (tester) async {
@@ -413,6 +443,7 @@ Future<void> _pumpExerciseList(
   required List<ExerciseWithLabels> exercises,
   Map<String, int> createdAtMap = const {},
   Map<String, int> logCountMap = const {},
+  Locale? locale,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -427,6 +458,7 @@ Future<void> _pumpExerciseList(
         ),
       ],
       child: localizedTestApp(
+        locale: locale,
         home: const Scaffold(body: ExerciseListContent()),
       ),
     ),

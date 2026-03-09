@@ -10,6 +10,7 @@ import 'package:training_log_app/features/splits/split_builder_draft.dart';
 import 'package:training_log_app/features/splits/split_builder_draft_storage.dart';
 import 'package:training_log_app/features/splits/split_builder_screen.dart';
 import 'package:training_log_app/features/splits/split_repository.dart';
+import 'package:training_log_app/l10n/app_localizations.dart';
 
 void main() {
   testWidgets(
@@ -242,6 +243,25 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'split builder shows shortened italian labels button on narrow screens',
+    (tester) async {
+      final repository = _FakeSplitRepository();
+      await _pumpSplitBuilder(
+        tester,
+        repository,
+        locale: const Locale('it'),
+        size: const Size(430, 932),
+      );
+
+      await tester.tap(find.byKey(const Key('split_builder_volume_toggle')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Etichette'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('split builder labels stay collapsed until chevron expands', (
     tester,
@@ -568,6 +588,8 @@ Future<void> _pumpSplitBuilder(
   _FakeSplitRepository repository, {
   SplitBuilderDraftStorage? storage,
   bool resumeDraft = false,
+  Locale? locale,
+  Size size = const Size(800, 1600),
 }) async {
   AppDatabase? ownedDatabase;
   final effectiveStorage =
@@ -580,7 +602,7 @@ Future<void> _pumpSplitBuilder(
     addTearDown(ownedDatabase!.close);
   }
 
-  await tester.binding.setSurfaceSize(const Size(800, 1600));
+  await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
     ProviderScope(
@@ -598,7 +620,12 @@ Future<void> _pumpSplitBuilder(
         splitRepositoryProvider.overrideWithValue(repository),
         splitBuilderDraftStorageProvider.overrideWithValue(effectiveStorage),
       ],
-      child: MaterialApp(home: SplitBuilderScreen(resumeDraft: resumeDraft)),
+      child: MaterialApp(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SplitBuilderScreen(resumeDraft: resumeDraft),
+      ),
     ),
   );
   await tester.pumpAndSettle();

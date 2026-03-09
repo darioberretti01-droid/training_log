@@ -70,18 +70,24 @@ class _SplitBuilderMuscleVolumeCardState
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Text(
-                    l10n.format('Whole split ({count} planned sets)', {
-                      'count': widget.summary.totalPlannedSets,
-                    }),
-                    style: Theme.of(context).textTheme.titleSmall,
+                  Expanded(
+                    child: Text(
+                      l10n.format('Whole split ({count} planned sets)', {
+                        'count': widget.summary.totalPlannedSets,
+                      }),
+                      style: Theme.of(context).textTheme.titleSmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   OutlinedButton.icon(
                     key: const Key('split_volume_control_labels_button'),
                     onPressed: () => _openControlLabelsDialog(context),
                     icon: const Icon(Icons.tune, size: 16),
-                    label: Text(l10n.tr('Control labels')),
+                    label: Text(
+                      l10n.tr('Control labels'),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

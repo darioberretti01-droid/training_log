@@ -440,14 +440,19 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
               _buildLoaded(context, exercises, createdAtMap, logCountMap),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => _ErrorState(
-            message: 'Failed to load exercises: $error',
+            message: context.l10n.format('Failed to load exercises: {error}', {
+              'error': error,
+            }),
             onRetry: () => ref.invalidate(exercisesProvider),
           ),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => _ErrorState(
-        message: 'Failed to initialize exercise data: $error',
+        message: context.l10n.format(
+          'Failed to initialize exercise data: {error}',
+          {'error': error},
+        ),
         onRetry: () => ref.invalidate(seedDataProvider),
       ),
     );
@@ -487,10 +492,12 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
             _buildToolbarLine(context),
             const SizedBox(height: 12),
             if (sections.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
-                  padding: EdgeInsets.all(14),
-                  child: Text('No exercises match the current filter.'),
+                  padding: const EdgeInsets.all(14),
+                  child: Text(
+                    context.l10n.tr('No exercises match the current filter.'),
+                  ),
                 ),
               )
             else
@@ -546,10 +553,10 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
     return TextField(
       key: const Key('exercises_search_field'),
       controller: _searchController,
-      decoration: const InputDecoration(
-        labelText: 'Search exercises',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.search),
+      decoration: InputDecoration(
+        labelText: context.l10n.tr('Search exercises'),
+        border: const OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.search),
       ),
       onChanged: (value) {
         setState(() => _query = value.trim().toLowerCase());
@@ -566,9 +573,9 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
       key: const Key('exercises_grouping_dropdown'),
       initialValue: _division,
       isExpanded: true,
-      decoration: const InputDecoration(
-        labelText: 'Division',
-        border: OutlineInputBorder(),
+      decoration: InputDecoration(
+        labelText: context.l10n.tr('Division'),
+        border: const OutlineInputBorder(),
         isDense: true,
       ),
       items: _ExerciseDivision.values
@@ -1047,7 +1054,9 @@ class _ExerciseListContentState extends ConsumerState<ExerciseListContent> {
               onPressed: _isMutating
                   ? null
                   : () => _confirmHideOrRestoreStandardExercise(exercise),
-              child: Text(exercise.isHidden ? 'RESTORE' : 'HIDE'),
+              child: Text(
+                context.l10n.tr(exercise.isHidden ? 'RESTORE' : 'HIDE'),
+              ),
             )
           : IconButton(
               key: _exerciseKey(
@@ -1235,31 +1244,44 @@ class _ExercisePillLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labels = context.l10n.localizeLabelsJoined(exercise.labels.take(3));
+    final localizedName = context.l10n.localizeExerciseName(exercise.name);
+    final maxLabelCount = _maxLabelCountForName(localizedName);
+    final labels = context.l10n.localizeLabelsJoined(
+      exercise.labels.take(maxLabelCount),
+    );
     final secondaryStyle = Theme.of(
       context,
     ).textTheme.labelSmall?.copyWith(fontSize: 10, height: 1.1);
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 170),
+      constraints: const BoxConstraints(maxWidth: 156),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            context.l10n.localizeExerciseName(exercise.name),
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text(localizedName, maxLines: 1, overflow: TextOverflow.ellipsis),
           if (labels.isNotEmpty)
             Text(
               labels,
               style: secondaryStyle,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
         ],
       ),
     );
   }
+}
+
+int _maxLabelCountForName(String localizedName) {
+  final length = localizedName.length;
+  if (length <= 16) {
+    return 3;
+  }
+  if (length <= 28) {
+    return 2;
+  }
+  return 1;
 }
 
 class _ExerciseListItem {
@@ -1441,7 +1463,10 @@ class _ErrorState extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            FilledButton(
+              onPressed: onRetry,
+              child: Text(context.l10n.tr('Retry')),
+            ),
           ],
         ),
       ),

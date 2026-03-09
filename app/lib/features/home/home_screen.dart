@@ -300,7 +300,10 @@ class _SuggestedWorkoutCard extends ConsumerWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: suggested.previewExerciseNames
-                    .map((name) => Chip(label: Text(name)))
+                    .map(
+                      (name) =>
+                          Chip(label: Text(l10n.localizeExerciseName(name))),
+                    )
                     .toList(growable: false),
               ),
             ],
@@ -534,53 +537,68 @@ class _SecondaryActionsRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeSplitDetailsState = ref.watch(activeSplitDetailsProvider);
+    final onLogDifferentSplit = splitsState.when(
+      data: (splits) {
+        if (splits.isEmpty) {
+          return null;
+        }
+        return () => _showSplitPicker(context, ref, splits, onOpenWorkout);
+      },
+      loading: () => null,
+      error: (_, _) => null,
+    );
+    final onLogDifferentDay = activeSplitDetailsState.when(
+      data: (split) {
+        if (split == null || split.days.isEmpty) {
+          return null;
+        }
+        return () =>
+            _showDayPicker(context, split: split, onPickDay: onOpenWorkout);
+      },
+      loading: () => null,
+      error: (_, _) => null,
+    );
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Column(
       children: [
-        OutlinedButton(
-          key: const Key('home_log_different_split'),
-          onPressed: splitsState.when(
-            data: (splits) {
-              if (splits.isEmpty) {
-                return null;
-              }
-              return () =>
-                  _showSplitPicker(context, ref, splits, onOpenWorkout);
-            },
-            loading: () => null,
-            error: (_, _) => null,
-          ),
-          child: Text(context.l10n.tr('Log different split')),
+        Row(
+          children: [
+            Expanded(
+              child: _HomeActionButton(
+                buttonKey: const Key('home_log_different_split'),
+                onPressed: onLogDifferentSplit,
+                label: context.l10n.tr('Log different split'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _HomeActionButton(
+                buttonKey: const Key('home_log_different_day'),
+                onPressed: onLogDifferentDay,
+                label: context.l10n.tr('Log different day'),
+              ),
+            ),
+          ],
         ),
-        OutlinedButton(
-          key: const Key('home_log_different_day'),
-          onPressed: activeSplitDetailsState.when(
-            data: (split) {
-              if (split == null || split.days.isEmpty) {
-                return null;
-              }
-              return () => _showDayPicker(
-                context,
-                split: split,
-                onPickDay: onOpenWorkout,
-              );
-            },
-            loading: () => null,
-            error: (_, _) => null,
-          ),
-          child: Text(context.l10n.tr('Log different day')),
-        ),
-        OutlinedButton(
-          key: const Key('home_free_workout'),
-          onPressed: () => context.push('/workout-logger?mode=free'),
-          child: Text(context.l10n.tr('Free workout')),
-        ),
-        OutlinedButton(
-          key: const Key('home_create_split'),
-          onPressed: () => context.push('/splits/builder'),
-          child: Text(context.l10n.tr('Create new split')),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _HomeActionButton(
+                buttonKey: const Key('home_free_workout'),
+                onPressed: () => context.push('/workout-logger?mode=free'),
+                label: context.l10n.tr('Free workout'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _HomeActionButton(
+                buttonKey: const Key('home_create_split'),
+                onPressed: () => context.push('/splits/builder'),
+                label: context.l10n.tr('Create new split'),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -682,6 +700,42 @@ class _SecondaryActionsRow extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeActionButton extends StatelessWidget {
+  const _HomeActionButton({
+    required this.buttonKey,
+    required this.onPressed,
+    required this.label,
+  });
+
+  final Key buttonKey;
+  final VoidCallback? onPressed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 56,
+      child: OutlinedButton(
+        key: buttonKey,
+        style: OutlinedButton.styleFrom(
+          alignment: Alignment.center,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        onPressed: onPressed,
+        child: Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
       ),
     );

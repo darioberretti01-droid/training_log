@@ -11,6 +11,7 @@ import 'package:training_log_app/features/home/home_workout_logic.dart';
 import 'package:training_log_app/features/splits/split_repository.dart';
 import 'package:training_log_app/features/workouts/workout_draft.dart';
 import 'package:training_log_app/features/workouts/quick_workout_repository.dart';
+import 'package:training_log_app/l10n/app_localizations.dart';
 
 void main() {
   testWidgets('home shows recent sessions below home actions', (tester) async {
@@ -43,7 +44,7 @@ void main() {
     await _pumpHome(tester, recentSessionsLoader: (_) async => sessions);
 
     expect(find.text('Recent sessions'), findsOneWidget);
-    expect(find.text('Quick workout - Jan 10'), findsOneWidget);
+    expect(find.text('Last session: Quick workout | Jan 10'), findsOneWidget);
     expect(find.text('5 sets'), findsOneWidget);
     expect(find.byKey(const Key('home_log_current_split')), findsOneWidget);
   });
@@ -326,6 +327,36 @@ void main() {
     expect(find.text('Log single exercise'), findsNothing);
   });
 
+  testWidgets('italian home localizes preview exercises and scheda copy', (
+    tester,
+  ) async {
+    await _pumpHome(
+      tester,
+      locale: const Locale('it'),
+      recentSessionsLoader: (_) async => const [],
+      suggestedWorkout: const SuggestedWorkoutCardState(
+        splitId: 'split_current',
+        splitName: 'Current Split',
+        nextDayName: 'Lower A',
+        nextDayIndex: 2,
+        exerciseCount: 3,
+        estimatedDurationMinutes: 30,
+        previewExerciseNames: [
+          'Back Squat',
+          'Romanian Deadlift',
+          'Standing Calf Raise',
+        ],
+        lastSessionSummary: null,
+      ),
+    );
+
+    expect(find.text('Squat con bilanciere'), findsOneWidget);
+    expect(find.text('Stacco rumeno'), findsOneWidget);
+    expect(find.text('Calf Raise in piedi'), findsOneWidget);
+    expect(find.text('Registra scheda diversa'), findsOneWidget);
+    expect(find.text('Crea nuova scheda'), findsOneWidget);
+  });
+
   testWidgets('home shows keep logging action for today draft', (tester) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     await _pumpHome(
@@ -361,6 +392,7 @@ Future<void> _pumpHome(
   HomeSessionOverviewEntry? lastSplitDaySession,
   SuggestedWorkoutCardState? suggestedWorkout,
   WorkoutDraft? workoutDraft,
+  Locale? locale,
 }) async {
   final router = GoRouter(
     routes: [
@@ -396,7 +428,12 @@ Future<void> _pumpHome(
         todayWorkoutDraftProvider.overrideWith((ref) => workoutDraft),
         activeSplitDetailsProvider.overrideWith((ref) async => null),
       ],
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        routerConfig: router,
+      ),
     ),
   );
   await tester.pumpAndSettle();
